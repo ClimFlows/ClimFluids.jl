@@ -5,7 +5,8 @@ using Test
 Base.isapprox(a::T, b::T) where {T<:Tuple} = all(map(isapprox, a,b))
 
 function test_fluid(fluid, p, T)
-    @testset "$(typeof(fluid))" begin
+    testname = "$(typeof(fluid))"
+    @testset "$testname" begin
         fluid_pT = fluid(:p, :T)
         v = fluid_pT.specific_volume(p,T)
         consvar = fluid_pT.conservative_variable(p,T)
