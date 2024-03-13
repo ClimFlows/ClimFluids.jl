@@ -5,8 +5,7 @@ using Test
 Base.isapprox(a::T, b::T) where {T<:Tuple} = all(map(isapprox, a,b))
 
 function test_fluid(fluid, p, T)
-    testname = "$(typeof(fluid))"
-    @testset "$testname" begin
+    @testset "$(typeof(fluid))" begin
         fluid_pT = fluid(:p, :T)
         v = fluid_pT.specific_volume(p,T)
         consvar = fluid_pT.conservative_variable(p,T)
@@ -14,7 +13,7 @@ function test_fluid(fluid, p, T)
         states = ((; p, T), (; p, s), (; p, consvar),
                 (; v, T), (; v, s), (; v, consvar))
         for fun in Thermo.all_state_functions()
-            @testset let name="$fun(::$(typeof(fluid)))"
+            @testset "$fun(::$(typeof(fluid)))" begin
                 state = (; p,v)
                 val = fun(fluid, state)
 #                @btime $fun($fluid, $state)
