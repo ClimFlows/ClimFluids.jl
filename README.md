@@ -5,12 +5,11 @@
 [![Build Status](https://github.com/ClimFlows/ClimFluids.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/ClimFlows/ClimFluids.jl/actions/workflows/CI.yml?query=branch%3Amain)
 [![Coverage](https://codecov.io/gh/ClimFlows/ClimFluids.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/ClimFlows/ClimFluids.jl)
 
-"""
 `ClimFluids` provides types and functions to compute
 thermodynamic functions of various fluids of interest for climate modelling.
 
 ## Installing
-For the moment, `ClimFluids` is registered with the ClimFluids registry. See [instructions there](https://github.com/ClimFlows/JuliaRegistry), then:
+`ClimFluids` is registered with the ClimFluids registry. See [instructions there](https://github.com/ClimFlows/JuliaRegistry), then:
 ```julia
 ]add ClimFluids
 ```
@@ -58,4 +57,3 @@ variables, thermodynamic functions must be specialized also for the type of thei
 
 Thermodynamic functions may be called in performance-critical inner loops.
 It is recommended to make them `@inline` and `@fastmath`.
-"""
