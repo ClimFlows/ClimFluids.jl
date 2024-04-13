@@ -9,6 +9,7 @@ MuladdMacro = "46d2c3a1-f734-5fdb-9937-b9b9aeba4221"
 
 [compat]
 MacroTools = "0.5"
+MuladdMacro = "0.2"
 julia = "1.8"
 
 [extras]
