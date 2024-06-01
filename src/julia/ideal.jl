@@ -1,14 +1,17 @@
 """
-    IdealPerfectGas(consvar,kappa,Cp,p0,T0)
-Returns an object describing the thermodynamics of a single-component ideal perfect gas.
-This object can then be used as first argument of thermodynamic functions.
-Argument `consvar` defines the conservative variable chosen. Legal values
-are `:temperature`, `:entropy`, `:enthalpy`, `:volume`, corresponding to 
+    fluid = IdealPerfectGas(consvar, kappa, Cp, p0, T0)
+    fluid = IdealPerfectGas(options)
+Return an object `fluid` describing the thermodynamics of a single-component ideal perfect gas.
+`fluid` can then be used as first argument of thermodynamic functions.
+Argument `consvar` defines the conservative variable chosen. Valid values
+are `:temperature`, `:entropy`, `:enthalpy`, `:volume`, corresponding to
 potential temperature, entropy, potential enthalpy, potential specific volume.
+
+Arguments can also be passed as a named tuple `options`.
 """
 struct IdealPerfectGas{CV,F} <: PerfectGas{F}
     kappa::F
-    Cp::F 
+    Cp::F
     Cv::F
     R ::F
     p0::F
@@ -16,9 +19,9 @@ struct IdealPerfectGas{CV,F} <: PerfectGas{F}
     inv_p0::F
     inv_Cp::F
 
-    function IdealPerfectGas(consvar::Symbol, kappa,Cp,p0,T0) 
+    function IdealPerfectGas(consvar::Symbol, kappa,Cp,p0,T0)
         @assert consvar in (:temperature, :entropy, :enthalpy, :volume)
-        new{consvar,typeof(kappa)}(kappa, Cp, (1-kappa)*Cp, kappa*Cp, p0, T0, inv(p0), inv(Cp))    
+        new{consvar,typeof(kappa)}(kappa, Cp, (1-kappa)*Cp, kappa*Cp, p0, T0, inv(p0), inv(Cp))
     end
 end
 IdealPerfectGas(params) = IdealPerfectGas(params.consvar,params.kappa, params.Cp, params.p0, params.T0)
@@ -70,13 +73,13 @@ const IPGV = IdealPerfectGas{:volume}
     end
 
     # Allows fallback implementations for inputs not covered above. Converts to (p,T)
-    canonical_state(gas::IPG, (p,consvar)::PCons) = (p, T=temperature(gas, (; p,consvar))) 
+    canonical_state(gas::IPG, (p,consvar)::PCons) = (p, T=temperature(gas, (; p,consvar)))
     canonical_state(gas::IPG, (p,s)::PS) = (p, T=temperature(gas, (; p,s)))
     canonical_state(gas::IPG, (p,v)::PV) = (p, T=p*v/gas.R)
     canonical_state(gas::IPG, (v,T)::VT) = (p=gas.R*T/v, T)
-    canonical_state(gas::IPG, (v,s)::VS) = canonical_state_IPG_vs(gas, (v,s)) 
-    canonical_state(gas::IPGS, (v,s)::VCons) = canonical_state_IPG_vs(gas, (v,s)) 
-    canonical_state(gas::IPGT, (v,theta)::VCons) = canonical_state_IPG_vtheta(gas, (v,theta)) 
+    canonical_state(gas::IPG, (v,s)::VS) = canonical_state_IPG_vs(gas, (v,s))
+    canonical_state(gas::IPGS, (v,s)::VCons) = canonical_state_IPG_vs(gas, (v,s))
+    canonical_state(gas::IPGT, (v,theta)::VCons) = canonical_state_IPG_vtheta(gas, (v,theta))
     function canonical_state_IPG_vs(gas, (v,s))
         # entropy = Cv*log(T*inv(T0))+R*log(v*inv(v0)) where v0=RT0/p0
         (; Cv, T0, R, inv_p0) = gas
@@ -85,7 +88,7 @@ const IPGV = IdealPerfectGas{:volume}
         p = R*T/v
         return (p=R*T/v, T)
     end
-    function canonical_state_IPG_vtheta(gas, (v,theta)) 
+    function canonical_state_IPG_vtheta(gas, (v,theta))
         # theta = T*(p/p0)^-(R/Cp)
         # pv = RT
         # R*theta = pv*(p/p0)^-(R/Cp)
