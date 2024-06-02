@@ -36,7 +36,7 @@ function test_exner_functions(fluid, p, T)
     consvar = fluid_pT.conservative_variable(p, T)
     enthalpy(p, consvar) = Thermo.specific_enthalpy(fluid, (; p, consvar))
     h, v, exner = Thermo.exner_functions(fluid, (;p, consvar))
-    h_, v_, exner_ = Thermo.ForwardDiff.exner_functions(fluid, (;p, consvar))
+    h_, v_, exner_ = Thermo.fwdd_exner_functions(fluid, (;p, consvar))
     @test h ≈ enthalpy(p, consvar)
     @test v ≈ Thermo.specific_volume(fluid, (;p, consvar))
     @test h ≈ h_
