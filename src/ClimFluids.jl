@@ -134,4 +134,16 @@ include("julia/binarygas.jl")
 
 @inline pow_fast(x, y) = @fastmath exp(y * log(x))
 
+module ForwardDiff
+# implemented only when ForwardDiff is loaded
+function exner_functions end
+end
+
+#========== for Julia <1.9 ==========#
+
+using PackageExtensionCompat
+function __init__()
+    @require_extensions
+end
+
 end # module

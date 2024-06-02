@@ -20,11 +20,11 @@ VCPG{F} = VarCpPerfectGas{F}
 
 """
     VarCpPerfectGas(kappa,Cp,p0,T0,nu)
-Returns an object describing the thermodynamics of a single-component perfect gas with variable Cp. 
+Returns an object describing the thermodynamics of a single-component perfect gas with variable Cp.
 This object can then be used as first argument of thermodynamic functions.
 """
 VarCpPerfectGas(kappa0, Cp0, p0, T0, nu) = VarCpPerfectGas(
-    kappa0, Cp0, (1-kappa0)*Cp0, kappa0*Cp0, p0, T0, nu, 
+    kappa0, Cp0, (1-kappa0)*Cp0, kappa0*Cp0, p0, T0, nu,
     inv(T0), inv(p0), inv(Cp0), inv(nu), inv(1+nu))
 VarCpPerfectGas(params) =  VarCpPerfectGas(
     params.kappa0, params.Cp0, params.p0, params.T0, params.nu)
@@ -35,37 +35,37 @@ VarCpPerfectGas(params) =  VarCpPerfectGas(
     LB10_enthalpy(Cp0,T0,nu, T) = inv(1+nu)*Cp0*T0*powm1(T*inv(T0), 1+nu)
 
     # interface functions
-    function heat_capacity(gas::VCPG, (p,T)::PT) 
+    function heat_capacity(gas::VCPG, (p,T)::PT)
         (;nu, T0, p0, kappa0, Cp0, R)=gas
         return Cp0 * (T*inv(T0))^nu
     end
 
-    specific_enthalpy(gas::VCPG, (p,T)::PT) = LB10_enthalpy(gas.Cp0,gas.T0,gas.nu, T) 
+    specific_enthalpy(gas::VCPG, (p,T)::PT) = LB10_enthalpy(gas.Cp0,gas.T0,gas.nu, T)
 
     # avoid loss of accuracy when nu is small (IPG limit)
     powm1(x,y) = expm1(y*log(x)) # x^y-1, accurate for small y
     pow1p(x,y) = exp(y*log1p(x)) # (1+x)^y, accurate for small x
     pow1pm1(x,y) = expm1(y*log1p(x)) # (1+x)^y-1, accurate for small x,y
 
-    function temperature(gas::VCPG, (p,theta)::PTh) 
+    function temperature(gas::VCPG, (p,theta)::PTh)
         (;nu, T0, p0, kappa0, Cp0, R)=gas
         # return (theta^nu + kappa0*nu*T0^nu*log(inv(p0)*p) )^inv(nu)
         # X = (theta/T0)^nu-1
         X = powm1(theta*inv(T0),nu)
         # Y = ((theta/T0)^nu+nu.kappa.log(p/p0))^(1/nu)
-        Y = pow1p( X + nu*kappa0*log(p*inv(p0)), inv(nu) ) 
-        return T0*Y 
+        Y = pow1p( X + nu*kappa0*log(p*inv(p0)), inv(nu) )
+        return T0*Y
     end
     function potential_temperature(gas::VCPG, (p,T)::PT)
         (;nu, T0, p0, kappa0, Cp0, R)=gas
         # return (T^nu - kappa0*nu*T0^nu*log(inv(p0)*p) )^inv(nu)
         # X = (T/T0)^nu-1
-        X = powm1(T*inv(T0),nu) 
+        X = powm1(T*inv(T0),nu)
         # Y = ((T/T0)^nu-nu.kappa.log(p/p0))^(1/nu)
-        Y = pow1p( X-nu*kappa0*log(inv(p0)*p), inv(nu) ) 
-        return T0*Y 
+        Y = pow1p( X-nu*kappa0*log(inv(p0)*p), inv(nu) )
+        return T0*Y
     end
-    
+
     conservative_variable(gas::VCPG, (p,T)::PT) = specific_entropy(gas, (;p,T))
     function specific_entropy(gas::VCPG, (p,T)::PT)
         (; nu, T0, p0, Cp0, R)=gas
@@ -84,23 +84,15 @@ VarCpPerfectGas(params) =  VarCpPerfectGas(
         (;nu, T0, p0, kappa0, Cp0, R)=gas
         X = s*inv(Cp0)+kappa0*log(p*inv(p0))
         Z = pow1pm1(nu*X, inv(nu)) # (1+nuX)^(1/nu)-1
-        T = T0*(1+Z)   
+        T = T0*(1+Z)
+        v = R*T*inv(p)
         h = inv(1+nu)*Cp0*T0*( Z+nu*X*(1+Z) )
-        return h-T*s, s, T
+        return h, v, T
     end
 
     function exner_functions(gas::VCPG, (p,T)::PT)
         consvar = conservative_variable(gas, (;p,T))
         exner_functions(gas, (; p,consvar))
-    end
-
-    function exner_functions(gas::VCPG, (p,theta)::PTh)
-        (;nu, T0, kappa0, Cp0, inv_p0, inv_Cp0, inv_nu, inv_nup1) = gas
-        X = s*inv_Cp0+kappa0*log(p*inv_p0)
-        Z = pow1pm1(nu*X, inv_nu) # (1+nuX)^(1/nu)-1
-        T = T0*(1+Z)
-        h = inv_nup1*Cp0*T0*( Z+nu*X*(1+Z) )
-        return h-T*s, s, T
     end
 
     # canonical_state : p,T
