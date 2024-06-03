@@ -18,6 +18,7 @@ ForwardDiff_Ext = ["ForwardDiff"]
 ForwardDiff = "0.10"
 MacroTools = "0.5"
 MuladdMacro = "0.2"
+PackageExtensionCompat = "1"
 julia = "1.8"
 
 [extras]
