@@ -95,6 +95,19 @@ VarCpPerfectGas(params) =  VarCpPerfectGas(
         exner_functions(gas, (; p,consvar))
     end
 
+    function volume_functions(gas::VCPG, (p,s)::PCons)
+        (;nu, T0, p0, kappa0, Cp0)=gas
+        X = s*inv(Cp0)+kappa0*log(p*inv(p0))
+        T = T0*pow1p(nu*X, inv(nu))
+        v = gas.R*T*inv(p)
+        # dX = inv(Cp0)*ds + kappa0*dp/p
+        # dT = T/(1+nu*X)*dX
+        # dv = R*dT/p - v dp/p
+        dv_p = v*(kappa0*inv(1+nu*X) - 1) * inv(p) # →(κ-1)*v/p
+        dv_s = v*inv(1+nu*X)*inv(Cp0)
+        return v, dv_p, dv_s
+    end
+
     # canonical_state : p,T
     canonical_state(gas::VCPG, (p,v)::PV)          = (; p, T=p*v/gas.R)
     canonical_state(gas::VCPG, (p,consvar)::PCons) = (; p, T=temperature(gas, (;p,consvar)))

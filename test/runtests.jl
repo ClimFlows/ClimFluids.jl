@@ -28,6 +28,7 @@ function test_fluid(fluid, p, T)
     @testset "$(typeof(fluid))" begin
         test_state_functions(fluid, p, T)
         test_exner_functions(fluid, p, T)
+        test_volume_functions(fluid, p, T)
     end
 end
 
@@ -42,6 +43,17 @@ function test_exner_functions(fluid, p, T)
     @test h ≈ h_
     @test v ≈ v_
     @test exner ≈ exner_
+end
+
+function test_volume_functions(fluid, p, T)
+    fluid_pT = fluid(:p, :T)
+    consvar = fluid_pT.conservative_variable(p, T)
+    volume(p, consvar) = Thermo.specific_volume(fluid, (; p, consvar))
+    v, dv_dp, dv_dconsvar = Thermo.volume_functions(fluid, (;p, consvar))
+    v_, dv_dp_, dv_dconsvar_ = Thermo.fwdd_volume_functions(fluid, (;p, consvar))
+    @test v ≈ volume(p, consvar)
+    @test dv_dp ≈ dv_dp_
+    @test dv_dconsvar ≈ dv_dconsvar_
 end
 
 function test_state_functions(fluid, p, T)

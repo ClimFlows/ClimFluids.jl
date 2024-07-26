@@ -59,11 +59,27 @@ const IPGV = IdealPerfectGas{:volume}
     exner_functions(gas::IPGT, (p,theta)::PCons) = let Π = gas.Cp*IPG_exner(gas, p), h = theta*Π
         h, gas.kappa*h*inv(p), Π
     end
+
+    function volume_functions(gas::IPGT, (p,theta)::PCons)
+        T = theta*IPG_exner(gas, p)
+        v = gas.R*T*inv(p)
+        dv_dtheta = v*inv(theta)
+        dv_dp = v*inv(p) * (gas.kappa-1)
+        return v, dv_dp, dv_dtheta
+    end
+
     #   potential enthalpy
     conservative_variable(   gas::IPGH, (p,T)::PT) = gas.Cp*IPG_theta(gas, p,T)
     temperature(             gas::IPGH, (p,hpot)::PCons) = gas.inv_Cp*hpot*IPG_exner(gas, p)
     exner_functions(         gas::IPGH, (p,hpot)::PCons) = let exner = IPG_exner(gas, p), h = hpot*exner
         h, gas.kappa*h*inv(p), exner
+    end
+    function volume_functions(gas::IPGH, (p,hpot)::PCons)
+        h = hpot*IPG_exner(gas, p)
+        v = gas.kappa*h*inv(p)
+        dv_dhpot = v*inv(hpot)
+        dv_dp = v*inv(p) * (gas.kappa-1)
+        return v, dv_dp, dv_dhpot
     end
     #   entropy
     conservative_variable(gas::IPGS, (p,T)::PT) = IPG_entropy(gas, p,T)
@@ -74,6 +90,13 @@ const IPGV = IdealPerfectGas{:volume}
     function exner_functions(gas::IPGS, (p,s)::PCons)
         T = temperature(gas, (;p,consvar=s))
         return gas.Cp*T, gas.R*T*inv(p), T
+    end
+    function volume_functions(gas::IPGS, (p,s)::PCons)
+        T = temperature(gas, (;p,consvar=s))
+        v = gas.R*T*inv(p)
+        dv_dp = v*inv(p) * (gas.kappa-1)
+        dv_ds = v*gas.inv_Cp
+        return v, dv_dp, dv_ds
     end
 
     # Allows fallback implementations for inputs not covered above. Converts to (p,T)
