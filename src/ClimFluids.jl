@@ -145,6 +145,9 @@ include("julia/binarygas.jl")
 function fwdd_exner_functions end
 function fwdd_volume_functions end
 
+# implemented only when Test is loaded
+function test_fluid end
+
 #========== for Julia <1.9 ==========#
 
 using PackageExtensionCompat
