@@ -51,7 +51,6 @@ const IPGV = IdealPerfectGas{:volume}
     potential_enthalpy(      gas::IPG, (p,T)::PT)     = IPG_enthalpy(gas, IPG_theta(gas, p, T))
     potential_volume(        gas::IPG, (p,T)::PT)     = IPG_pot_volume(gas, p, T)
     temperature(             gas::IPG, (p,s)::PS)     = IPG_temperature_ps(gas, p, s)
-    exner_functions(         gas::IPG, (p,T)::PT)     = exner_functions(gas, (; p, consvar=conservative_variable(gas, (;p,T))))
     # routines depending on conservative variable
     #   potential temperature
     conservative_variable(   gas::IPGT, (p,T)::PT) = IPG_theta(gas, p,T)

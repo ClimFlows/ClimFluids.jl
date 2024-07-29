@@ -44,6 +44,7 @@ const VCons = NamedTuple{(:v, :consvar)}
         potential_enthalpy,
         potential_temperature,
         exner_functions,
+        volume_functions,
         sound_speed2,
         sound_speed,
     )
@@ -67,7 +68,7 @@ const VCons = NamedTuple{(:v, :consvar)}
 
 end
 
-# fallback, only sound_speed2 needs to be implemented 
+# fallback, only sound_speed2 needs to be implemented
 @inline sound_speed(fluid::AbstractFluid, state::NamedTuple) = @fastmath sqrt(sound_speed2(fluid, state))
 
 for fun in propertynames(all_state_functions())
