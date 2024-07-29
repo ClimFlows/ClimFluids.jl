@@ -1,7 +1,7 @@
 name = "ClimFluids"
 uuid = "68475963-a72f-47d4-b871-9c5545ecd1c0"
 authors = ["The ClimFlows contributors"]
-version = "0.1.1"
+version = "0.1.2"
 
 [deps]
 MacroTools = "1914dd2f-81c6-5fcd-8719-6d5c9610ff09"
@@ -10,9 +10,11 @@ PackageExtensionCompat = "65ce6f38-6b18-4e1d-a461-8949797d7930"
 
 [weakdeps]
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [extensions]
 ForwardDiff_Ext = ["ForwardDiff"]
+Test_Ext = ["ForwardDiff", "Test"]
 
 [compat]
 ForwardDiff = "0.10"

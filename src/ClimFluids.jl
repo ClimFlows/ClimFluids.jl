@@ -88,6 +88,13 @@ and its derivatives : specific volume, and Exner-like functions.
 function exner_functions end
 
 """
+    v, dv_dp, dv_consvar, [dv_dq] = volume_functions(fluid, state)
+Returns specific volume, regarded as a function of pressure, conservative variable and (if applicable) composition,
+and its derivatives.
+"""
+function volume_functions end
+
+"""
     e = specific_internal_energy(fluid, state)
 Returns specific internal energy given a `fluid` and a `state` (named tuple of state variables).
 """
@@ -136,6 +143,10 @@ include("julia/binarygas.jl")
 
 # implemented only when ForwardDiff is loaded
 function fwdd_exner_functions end
+function fwdd_volume_functions end
+
+# implemented only when Test is loaded
+function test_fluid end
 
 #========== for Julia <1.9 ==========#
 

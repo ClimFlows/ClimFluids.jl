@@ -19,9 +19,11 @@ end
 VCPG{F} = VarCpPerfectGas{F}
 
 """
-    VarCpPerfectGas(kappa,Cp,p0,T0,nu)
-Returns an object describing the thermodynamics of a single-component perfect gas with variable Cp.
+    gas = VarCpPerfectGas(kappa,Cp,p0,T0,nu)
+Return an object describing the thermodynamics of a single-component perfect gas
+with temperature-dependent heat capacity (Lebonnois et al., J. Geohys. Res., 2010).
 This object can then be used as first argument of thermodynamic functions.
+The conservative variable is specific entropy.
 """
 VarCpPerfectGas(kappa0, Cp0, p0, T0, nu) = VarCpPerfectGas(
     kappa0, Cp0, (1-kappa0)*Cp0, kappa0*Cp0, p0, T0, nu,
@@ -90,9 +92,17 @@ VarCpPerfectGas(params) =  VarCpPerfectGas(
         return h, v, T
     end
 
-    function exner_functions(gas::VCPG, (p,T)::PT)
-        consvar = conservative_variable(gas, (;p,T))
-        exner_functions(gas, (; p,consvar))
+    function volume_functions(gas::VCPG, (p,s)::PCons)
+        (;nu, T0, p0, kappa0, Cp0)=gas
+        X = s*inv(Cp0)+kappa0*log(p*inv(p0))
+        T = T0*pow1p(nu*X, inv(nu))
+        v = gas.R*T*inv(p)
+        # dX = inv(Cp0)*ds + kappa0*dp/p
+        # dT = T/(1+nu*X)*dX
+        # dv = R*dT/p - v dp/p
+        dv_p = v*(kappa0*inv(1+nu*X) - 1) * inv(p) # →(κ-1)*v/p
+        dv_s = v*inv(1+nu*X)*inv(Cp0)
+        return v, dv_p, dv_s
     end
 
     # canonical_state : p,T
