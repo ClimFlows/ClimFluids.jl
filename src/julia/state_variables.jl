@@ -40,6 +40,7 @@ const VCons = NamedTuple{(:v, :consvar)}
         specific_volume,
         specific_entropy,
         specific_enthalpy,
+        specific_internal_energy,
         potential_volume,
         potential_enthalpy,
         potential_temperature,
