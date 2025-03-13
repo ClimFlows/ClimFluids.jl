@@ -9,10 +9,13 @@ function test()
     p, T = 1.1e5, 275
     IPG = ClimFluids.IdealPerfectGas
     CPV = ClimFluids.VarCpPerfectGas
-    consvars = Dict(IPG => (:temperature, :entropy, :enthalpy), CPV => (:temperature,))
+    LSF = ClimFluids.LinearSimpleFluid
+    consvars = Dict(IPG => (:temperature, :entropy, :enthalpy), CPV => (:temperature,), LSF=>(:entropy, :conservative_temperature))
 
-    params = map(Float32, params)
-    p, T = map(Float32, (p, T))
+    prec = Float32
+    params = map(prec, params)
+    params = (prec, params...) # LSF
+    p, T = map(prec, (p, T))
 
     for Fluid in keys(consvars)
         for consvar in consvars[Fluid]
