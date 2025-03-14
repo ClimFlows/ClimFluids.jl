@@ -134,12 +134,10 @@ end
 
 include("julia/inlineall.jl")
 include("julia/state_variables.jl")
-
 include("julia/perfectgas.jl")
 include("julia/ideal.jl")
 include("julia/lebonnois.jl")
 include("julia/linear_simple_fluid.jl")
-
 include("julia/binarygas.jl")
 
 @inline pow_fast(x, y) = @fastmath exp(y * log(x))

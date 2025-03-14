@@ -1,137 +1,188 @@
 """
-Linear Simple Fluid EOS
+    fluid = LinearSimpleFluid(consvar, prec)
+    fluid = LinearSimpleFluid(options)
+Return an object `fluid` describing the thermodynamics of a single-component linear simple fluid.
+The parameters are fixed to represent salt-less seawater.
+`fluid` can then be used as first argument of thermodynamic functions.
+Argument `consvar` defines the conservative variable chosen. Valid values are `:entropy`, 
+`:conservative_temperature` corresponding to specific entropy, conservative temperature.
+
+Arguments can also be passed as a named tuple `options`.
 """
 struct LinearSimpleFluid{CV, F} <: SimpleFluid{F}
     p0::F
     T0::F
     cp0::F
     ρ0::F
-    α0::F
+    v0::F
     cs0::F
     βT::F
     βp::F
     cp0_ct::F
+
     function LinearSimpleFluid(consvar::Symbol, prec)
+        @assert consvar in (:entropy, :conservative_temperature)
         new{consvar, prec}(101325, 273.15, 3986, 1027.0, 9.738e-4, 1490, 1.67e-4, 4.39e-10, 3991.86795711963)
     end
 end
 LinearSimpleFluid(params) = LinearSimpleFluid(params.consvar, params.prec)
 
-LSF = LinearSimpleFluid
-LSFE = LinearSimpleFluid{:entropy}
-LSFC = LinearSimpleFluid{:conservative_temperature}
+const iter_default = 8     # default number of iterations for Newton method
 
-VCons = NamedTuple{(:v, :consvar)}
-PCons = NamedTuple{(:p, :consvar)}
-PT = NamedTuple{(:p, :T)}
-VT = NamedTuple{(:v, :T)}
+const LSF   = LinearSimpleFluid
+const LSFS  = LinearSimpleFluid{:entropy}
+const LSFC  = LinearSimpleFluid{:conservative_temperature}
 
 @fastmath @muladd @inlineall begin
     ## private functions
-    LSF_gibbs((; α0, p0, T0, cp0, βp, βT), p, T)            = -cp0 * T * ( log(T * inv(T0)) - 1 ) + α0 * ( p - p0 ) * ( 1 + βT * ( T - T0 ) - 0.5 * βp * ( p - p0 ) )
-    LSF_specific_volume((; α0, p0, T0, βp, βT), p, T)       = α0 * ( 1 + βT * ( T - T0 ) - βp * ( p - p0 ) )
-    LSF_specific_entropy((; α0, p0, T0, cp0, βT), p, T)     = cp0 * ( log(T *inv(T0)) ) - α0 * βT *( p - p0 ) 
-    LSF_specific_heat_capacity((; cp0), p, T)               = cp0 * one(T)
+    LSF_gibbs((; v0, p0, T0, cp0, βp, βT), p, T)            = -cp0 * T * ( log(T * inv(T0)) - 1 ) + v0 * ( p - p0 ) * ( 1 + βT * ( T - T0 ) - 0.5 * βp * ( p - p0 ) )
+    LSF_enthalpy((; v0, p0, T0, cp0, βp, βT), p, T)         = cp0 * T + v0 * ( p - p0 ) * ( 1 - βT * T0 - 0.5 * βp * ( p - p0 ) )
+    LSF_internal_energy((; v0, p0, T0, cp0, βp, βT), p, T)  = cp0 * T - v0 * ( p0 + βT * ( p * T - p0 * T0 ) - 0.5 * βp * ( p * p - p0 * p0 ) )
+    LSF_specific_volume((; v0, p0, T0, βp, βT), p, T)       = v0 * ( 1 + βT * ( T - T0 ) - βp * ( p - p0 ) )    #  gibbs_p
+    LSF_entropy((; v0, p0, T0, cp0, βT), p, T)              = cp0 * ( log(T *inv(T0)) ) - v0 * βT *( p - p0 )   # -gibbs_T
+    LSF_heat_capacity((; cp0), p, T)                        = cp0 * one(T)
     LSF_gibbs_TT((; cp0), p, T)                             = -cp0 * inv(T)
-    LSF_gibbs_pp((; α0, βp), p, T)                          = - α0 * βp * one(T)
-    LSF_gibbs_pT((; α0, βT), p, T)                          = α0 *  βT * one(T)
-    LSF_specific_enthalpy((; α0, p0, T0, cp0, βp, βT), p, T) = cp0 * T + α0 * ( p - p0 ) * ( 1 - βT * T0 - 0.5 * βp * ( p - p0 ) )
-    LSF_potential_temperature((; α0, p0, cp0, βT), p, T)    = T * exp( - α0 * βT * ( p - p0 ) * inv( cp0 ) ) 
+    LSF_gibbs_pp((; v0, βp), p, T)                          = -v0 * βp * one(T)
+    LSF_gibbs_pT((; v0, βT), p, T)                          = v0 *  βT * one(T)
+    LSF_sound_speed2((; v0, βT, T0, βp, p0, cp0), p, T)     = v0 * ( 1 + βT * ( T - T0 ) - βp * ( p - p0 ) )^2 * cp0 * inv( βp * cp0 - v0 * βT * βT * T)
+    LSF_pt((; v0, p0, cp0, βT), p, T)                       = T * exp( - v0 * βT * ( p - p0 ) * inv( cp0 ) ) 
     LSF_pt_from_ct((; cp0_ct, cp0), Θ)                      = ( cp0_ct * Θ ) * inv( cp0 )
-    LSF_entropy_from_pt((; α0, p0, T0, cp0, βT), θ)         = LSF_specific_entropy((; α0, p0, T0, cp0, βT), p0, θ)
-    LSF_entropy_from_ct((; cp0_ct, g0, η0, α0, p0, T0, cp0, βT, η0), Θ) = LSF_entropy_from_pt((; α0, p0, T0, cp0, βT), LSF_pt_from_ct((; cp0_ct, cp0), Θ))
-    
-    LSF_sound_speed2((; α0, βT, T0, βp, p0, cp0), p, T) = α0 * ( 1 + βT * ( T - T0 ) - βp * ( p - p0 ) )^2 * cp0 * inv( βp * cp0 - α0 * βT * βT * T)
-    
-    # pressure and temperature from (v, η)
-    function LSF_pressure_temperature(fluid, v, η, T, iters)
-        (; cp0, p0, T0, α0, βT, βp) = fluid
-        inv_βp = inv(βp)
-        for i in 1:iters        
-            f = cp0 * ( log(T * inv(T0)) )- α0 * βT * βT * inv_βp * (T - T0) - η - βT * inv_βp * ( α0 - v )
-            f_T = cp0 * inv(T) - α0 * βT * βT * inv_βp
-            err = f * inv(f_T)
-            T = T - err
-            if abs(err) < 1e-12
-                break
-            elseif i == iters
-                @info err
-                error("Newton iteration did not converge")
-            end
-        end
-        p = p0 + inv_βp * ( 1 + βT * ( T - T0 ) - v * inv(α0) )
-        return p, T
-    end
+    LSF_entropy_from_pt((; v0, p0, T0, cp0, βT), θ)         = LSF_entropy((; v0, p0, T0, cp0, βT), p0, θ)
+    LSF_entropy_from_ct((; cp0_ct, v0, p0, T0, cp0, βT), Θ) = LSF_entropy_from_pt((; v0, p0, T0, cp0, βT), LSF_pt_from_ct((; cp0_ct, cp0), Θ))
+    LSF_pressure_vT((; p0, T0, v0, βT, βp), v, T)           = p0 + ( βT * (T - T0) +  1 - v * inv(v0))  * inv(βp)
+    LSF_temperature_ps((; cp0, p0, T0, v0, βT), p, s)       = T0 * exp( inv(cp0) * (s + v0 * βT * ( p - p0 ) ) )
+    LSF_temperature_pv((; p0, T0, v0, βT, βp), p, v)        = T0 + inv(v0 * βT) * ( v - v0 ) + βp * inv(βT) * ( p - p0 )
 
-    function LSF_temperature_v_η(fluid, v, η, T, iters)
-        (; cp0, T0, α0, βT, βp) = fluid
+    function LSF_temperature_vs(fluid, v, s, T, iters)
+        (; cp0, T0, v0, βT, βp) = fluid
         inv_βp = inv(βp)
         for _ in 1:iters        
-            f = cp0 * ( log(T * inv(T0)) )- α0 * βT * βT * inv_βp * (T - T0) - η - βT * inv_βp * ( α0 - v )
-            f_T = cp0 * inv(T) - α0 * βT * βT * inv_βp
+            f = cp0 * ( log(T * inv(T0)) ) - v0 * βT * βT * inv_βp * (T - T0) - s - βT * inv_βp * ( v0 - v )
+            f_T = cp0 * inv(T) - v0 * βT * βT * inv_βp
             err = f * inv(f_T)
             T = T - err
         end
         return T
     end
-    # function temp_lambert(fluid, v, η)
-    #     (; α0, βT, βp, cp0, T0) = fluid
-    #     pref = - α0 * βT * βT * inv(βp) * inv(cp0)
-    #     T0_ = T0 * pref
-    #     inv_βp, inv_cp0 = inv(βp), inv(cp0)
-    #     T_ = lambertw( T0_ * exp(T0_ + βT * inv_βp * inv_cp0 * (α0 - v) + η * inv_cp0))
-    #     return T_ * inv(pref)
-    # end
 
-    # temperature from (p, η)
-    LSF_temperature((; cp0, p0, T0, α0, βT), p, η)  = T0 * exp( inv(cp0) * (η + α0 * βT * ( p - p0 ) ) )
-
-    # pressure from (v, T)
-    LSF_pressure((; p0, T0, α0, βT, βp), v, T)      = p0 + inv( βp ) * ( 1 + βT * ( T - T0 ) ) - v * inv( α0 * βp ) 
+    function LSF_pressure_vs(fluid, v, s, p, iters)
+        (; cp0, p0, T0, v0, βT, βp) = fluid
+        inv_βTT0 = inv(βT * T0)
+        δp = p - p0
+        for _ in 1:iters
+            g = cp0 * log( 1 + inv_βTT0 * ( v * inv(v0) - 1 + βp * δp ) ) - v0 * βT * δp - s
+            g_T = cp0 * βp * inv( βT * T0 + v * inv(v0) - 1 + βp * δp) - v0 * βT
+            err = g * inv(g_T)
+            δp = δp - err
+        end
+        return δp + p0
+    end
 
     ## all consvar
-    specific_enthalpy(fluid::LSF, (p, T)::PT)   = LSF_specific_enthalpy(fluid, p, T)
-    gibbs_function(fluid::LSF, (p, T)::PT)      = LSF_gibbs(fluid, p, T)
-    specific_entropy(fluid::LSF, (p, T)::PT)    = LSF_specific_entropy(fluid, p, T)
-    specific_volume(fluid::LSF, (p, T)::PT)     = LSF_specific_volume(fluid, p, T)
-    sound_speed(fluid::LSF, (p, T)::PT)         = sqrt(LSF_sound_speed2(fluid, p, T))
-    sound_speed2(fluid::LSF, (p, T)::PT)        = LSF_sound_speed2(fluid, p, T)
-    isobaric_heat_capacity(fluid::LSF, (p, T)::PT)   = LSF_specific_heat_capacity(fluid, p, T)
-    pressure(fluid::LSF, (v, T)::VT)            = LSF_pressure(fluid, v, T)
+    # Defined throughout ClimFluids:
+    specific_entropy(           fluid::LSF, (p, T)::PT)     = LSF_entropy(fluid, p, T)
+    specific_enthalpy(          fluid::LSF, (p, T)::PT) 	= LSF_enthalpy(fluid, p, T)
+    specific_internal_energy(   fluid::LSF, (p, T)::PT)     = LSF_internal_energy(fluid, p, T) 
+    sound_speed2(               fluid::LSF, (p, T)::PT)     = LSF_sound_speed2(fluid, p, T)
+    potential_temperature(      fluid::LSF, (p, T)::PT)     = LSF_pt(fluid, p, T)
+    potential_enthalpy(         fluid::LSF, (p, T)::PT)     = LSF_enthalpy(fluid, fluid.p0, LSF_pt(fluid, p, T))
+    potential_volume(           fluid::LSF, (p, T)::PT)     = LSF_specific_volume(fluid, fluid.p0, LSF_pt(fluid, p, T))
+    heat_capacity(              fluid::LSF, (p, T)::PT)     = LSF_heat_capacity(fluid, p, T)
+    pressure(                   fluid::LSF, (v, T)::VT)     = LSF_pressure_vT(fluid, v, T)
+    
+    # Defined here only:
+    conservative_temperature(   fluid::LSF, (p, T)::PT)     = LSF_enthalpy(fluid, fluid.p0, LSF_pt(fluid, p, T)) * inv(fluid.cp0_ct)
+    specific_gibbs(             fluid::LSF, (p, T)::PT)     = LSF_gibbs(fluid, p, T)
+    specific_volume(            fluid::LSF, (p, T)::PT)     = LSF_specific_volume(fluid, p, T)
+
 
     ## consvar = :entropy
 
-    # PCons
-    temperature(fluid::LSFE, (p, η)::PCons)         = LSF_temperature(fluid, p, η)
-    specific_enthalpy(fluid::LSFE, (p, η)::PCons)   = LSF_specific_enthalpy(fluid, p, LSF_temperature(fluid, p, η))
-    specific_volume(fluid::LSFE, (p, η)::PCons)     = LSF_specific_volume(fluid, p, LSF_temperature(fluid, p, η))
-    dT_consvar(fluid::LSFE, (p, η)::PCons)          = LSF_dT_η(fluid, p, η)
-
-    # VCons
-    temperature(fluid::LSFE, (v, η)::VCons; T_ = fluid.T0, iters = 10)          = LSF_temperature_v_η(fluid, v, η, T_, iters)
-    # pressure_temperature(fluid::LSFE, (v, η)::VCons; T_ = fluid.T0, iters = 3)  = LSF_pressure_temperature(fluid, v, η, T_, iters)
-    pressure(fluid::LSFE, (v, η)::VCons; T_ = fluid.T0, iters = 10)              = LSF_pressure(fluid, v, LSF_temperature_v_η(fluid, v, η, T_, iters))
-    
     # PT
-    conjugate_variable(fluid::LSFE, (p, T)::PT)     = T
-    conservative_variable(fluid::LSFE, (p, T)::PT)  = LSF_specific_entropy(fluid, p, T)
-    gibbs_pT(fluid::LSFE, (p, T)::PT)               = LSF_gibbs_pT(fluid, p, T)
-    gibbs_TT(fluid::LSFE, (p, T)::PT)               = LSF_gibbs_TT(fluid, p, T)
+    conservative_variable(  fluid::LSFS, (p, T)::PT)        = LSF_entropy(fluid, p, T)
+    conjugate_variable(     fluid::LSFS, (p, T)::PT)        = T
+
+    # PCons
+    temperature(        fluid::LSFS, (p, s)::PCons)         = LSF_temperature_ps(fluid, p, s)
+    specific_enthalpy(  fluid::LSFS, (p, s)::PCons)         = LSF_enthalpy(fluid, p, LSF_temperature_ps(fluid, p, s))
+    specific_volume(    fluid::LSFS, (p, s)::PCons)         = LSF_specific_volume(fluid, p, LSF_temperature_ps(fluid, p, s))
+    
+    function exner_functions(fluid::LSFS, (p, s)::PCons)    # returns h, v, conjvar = T
+        T = LSF_temperature_ps(fluid, p, s)
+        h = LSF_enthalpy(fluid, p, T)
+        v = LSF_specific_volume(fluid, p, T)
+        return h, v, T
+    end
+    function volume_functions(fluid::LSFS, (p, s)::PCons)   # returns v, ∂v/∂p, ∂v/∂s
+        T = LSF_temperature_ps(fluid, p, s)
+        v = LSF_specific_volume(fluid, p, T)
+        dv_dp = LSF_gibbs_pp(fluid, p, T)
+        dv_ds = -LSF_gibbs_pT(fluid, p, T) * inv( LSF_gibbs_TT(fluid, p, T) )
+        return v, dv_dp, dv_ds
+    end
+    
+    # VCons
+    temperature(    fluid::LSFS, (v, s)::VCons; T_ = fluid.T0, iters = iter_default)  = LSF_temperature_vs(fluid, v, s, T_, iters)
+    pressure(       fluid::LSFS, (v, s)::VCons; p_ = fluid.p0, iters = iter_default)  = LSF_pressure_vs(fluid, v, s, p_, iters)
+    
     
     ## consvar = :conservative_temperature
+    
+    # PT
+    conservative_variable(  fluid::LSFC, (p, T)::PT)        = LSF_enthalpy(fluid, fluid.p0, LSF_pt(fluid, p, T)) * inv(fluid.cp0_ct)
+    conjugate_variable(     fluid::LSFC, (p, T)::PT)        = fluid.cp0_ct * T * inv( LSF_pt(fluid, p, T) )
 
     # PCons
-    temperature(fluid::LSFC, (p, Θ)::PCons)         = LSF_temperature(fluid, p, LSF_entropy_from_ct(fluid, Θ))
-    specific_enthalpy(fluid::LSFC, (p, Θ)::PCons)   = LSF_specific_enthalpy(fluid, p, LSF_temperature(fluid, p, LSF_entropy_from_ct(fluid, Θ)))
-    specific_volume(fluid::LSFC, (p, Θ)::PCons)     = LSF_specific_volume(fluid, p, LSF_temperature(fluid, p, LSF_entropy_from_ct(fluid, Θ)))
+    temperature(        fluid::LSFC, (p, Θ)::PCons)         = LSF_temperature_ps(fluid, p, LSF_entropy_from_ct(fluid, Θ))
+    specific_enthalpy(  fluid::LSFC, (p, Θ)::PCons)         = LSF_enthalpy(fluid, p, LSF_temperature_ps(fluid, p, LSF_entropy_from_ct(fluid, Θ)))
+    specific_volume(    fluid::LSFC, (p, Θ)::PCons)         = LSF_specific_volume(fluid, p, LSF_temperature_ps(fluid, p, LSF_entropy_from_ct(fluid, Θ)))
+
+    function exner_functions(fluid::LSFC, (p, Θ)::PCons)    # returns h, v, conjvar = cp0_ct * T / θ
+        s = LSF_entropy_from_ct(fluid, Θ)
+        T = LSF_temperature_ps(fluid, p, s)
+        h = LSF_enthalpy(fluid, p, T)
+        v = LSF_specific_volume(fluid, p, T)
+        conjvar = fluid.cp0_ct * T * inv( LSF_pt(fluid, p, T) )
+        return h, v, conjvar
+    end
+    function volume_functions(fluid::LSFC, (p, Θ)::PCons)   # returns v, ∂v/∂p, ∂v/∂Θ
+        s = LSF_entropy_from_ct(fluid, Θ)
+        T = LSF_temperature_ps(fluid, p, s)
+        v = LSF_specific_volume(fluid, p, T)
+        θ = LSF_pt(fluid, p, T)
+        dv_dp = LSF_gibbs_pp(fluid, p, T)
+        # ∂v/∂Θ = ∂v/∂T * ∂T/∂Θ = ∂v/∂T / ( ∂η/∂T * dΘ/dη ) = g_TT / ( -g_TT * θ / cp0_ct)
+        dv_dΘ = -LSF_gibbs_pT(fluid, p, T) * fluid.cp0_ct * inv( LSF_gibbs_TT(fluid, p, T) * θ ) 
+        return v, dv_dp, dv_dΘ
+    end
 
     # VCons
-    temperature(fluid::LSFC, (v, Θ)::VCons; T_ = fluid.T0, iters = 10)   = LSF_temperature_v_η(fluid, v, LSF_entropy_from_ct(fluid, Θ), T_, iters)
-    # pressure_temperature(fluid::LSFC, (v, Θ)::VCons; T_ = fluid.T0, iters = 10) = LSF_pressure_temperature(fluid, v, LSF_entropy_from_ct(fluid, Θ), T_, iters)
-    pressure(fluid::LSFC, (v, Θ)::VCons; T_ = fluid.T0, iters = 10) = LSF_pressure(fluid, v, LSF_temperature_v_η(fluid, v, LSF_entropy_from_ct(fluid, Θ), T_, iters))
+    temperature(    fluid::LSFC, (v, Θ)::VCons; T_ = fluid.T0, iters = iter_default)    = LSF_temperature_vs(fluid, v, LSF_entropy_from_ct(fluid, Θ), T_, iters)
+    pressure(       fluid::LSFC, (v, Θ)::VCons; p_ = fluid.p0, iters = iter_default)    = LSF_pressure_vs(fluid, v, LSF_entropy_from_ct(fluid, Θ), p_, iters)
 
-    # PT
-    conjugate_variable(fluid::LSFC, (p, T)::PT)     = fluid.cp0_ct * T * inv( LSF_potential_temperature(fluid, p, T) )
-    conservative_variable(fluid::LSFC, (p, T)::PT)  = LSF_specific_enthalpy(fluid, fluid.p0, LSF_potential_temperature(fluid, p, T)) * inv(fluid.cp0_ct)
+    ## Fallback: convert to (p, T) if not implemented above
+    canonical_state(fluid::LSF, (p, consvar)::PCons)        = (p, T = temperature(fluid, (; p, consvar)))
+    canonical_state(fluid::LSF, (p, s)::PS)                 = (p, T = LSF_temperature_ps(fluid, p, s))
+    canonical_state(fluid::LSF, (p, v)::PV)                 = (p, T = LSF_temperature_pv(fluid, p, v))
+    canonical_state(fluid::LSF, (v, T)::VT)                 = (p = pressure(fluid, (; v, T)), T)
+    canonical_state(fluid::LSF, (v, s)::VS)                 = canonical_state_LSF_vs(fluid, (v, s))
+    canonical_state(fluid::LSFS, (v, s)::VCons)             = canonical_state_LSF_vs(fluid, (v, s))
+    canonical_state(fluid::LSFC, (v, Θ)::VCons)             = canonical_state_LSF_vΘ(fluid, (v, Θ))
     
+    function canonical_state_LSF_vs(fluid, (v, s))
+        T = LSF_temperature_vs(fluid, v, s, fluid.T0, iter_default)
+        p = LSF_pressure_vs(fluid, v, s, fluid.p0, iter_default)
+        return (; p, T)
+    end
+
+    function canonical_state_LSF_vΘ(fluid, (v, Θ))
+        s = LSF_entropy_from_ct(fluid, Θ)
+        T = LSF_temperature_vs(fluid, v, s, fluid.T0, iter_default)
+        p = LSF_pressure_vs(fluid, v, s, fluid.p0, iter_default)
+        return (; p, T)
+    end
+
+    exner_functions(fluid::LSF, (p, T)::PT)     = exner_functions(fluid, (; p, consvar=conservative_variable(fluid, (; p, T))))
+    volume_functions(fluid::LSF, (p, T)::PT)    = volume_functions(fluid, (; p, consvar=conservative_variable(fluid, (; p, T))))
+
 end
