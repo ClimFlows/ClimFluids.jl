@@ -116,7 +116,8 @@ const LSFC  = LinearSimpleFluid{:conservative_temperature}
     function volume_functions(fluid::LSFS, (p, s)::PCons)   # returns v, ∂v/∂p, ∂v/∂s
         T = LSF_temperature_ps(fluid, p, s)
         v = LSF_specific_volume(fluid, p, T)
-        dv_dp = LSF_gibbs_pp(fluid, p, T)
+        cs2 = LSF_sound_speed2(fluid, p, T)
+        dv_dp = - v*v / cs2
         dv_ds = -LSF_gibbs_pT(fluid, p, T) * inv( LSF_gibbs_TT(fluid, p, T) )
         return v, dv_dp, dv_ds
     end
@@ -150,7 +151,8 @@ const LSFC  = LinearSimpleFluid{:conservative_temperature}
         T = LSF_temperature_ps(fluid, p, s)
         v = LSF_specific_volume(fluid, p, T)
         θ = LSF_pt(fluid, p, T)
-        dv_dp = LSF_gibbs_pp(fluid, p, T)
+        cs2 = LSF_sound_speed2(fluid, p, T)
+        dv_dp = - v*v / cs2
         # ∂v/∂Θ = ∂v/∂T * ∂T/∂Θ = ∂v/∂T / ( ∂η/∂T * dΘ/dη ) = g_TT / ( -g_TT * θ / cp0_ct)
         dv_dΘ = -LSF_gibbs_pT(fluid, p, T) * fluid.cp0_ct * inv( LSF_gibbs_TT(fluid, p, T) * θ ) 
         return v, dv_dp, dv_dΘ
