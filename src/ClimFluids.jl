@@ -33,6 +33,12 @@ Which conservative variable is chosen is a parameter given to the constructor of
 function conservative_variable end
 
 """
+    conjvar = conjugate_variable(fluid, state)
+Returns the variable conjugate to the conservative variable given a `fluid` and a `state` (named tuple of state variables).
+"""
+function conjugate_variable end
+
+"""
     p = pressure(fluid, state)
 Returns pressure given a `fluid` and a `state` (named tuple of state variables).
 """

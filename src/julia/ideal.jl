@@ -51,9 +51,11 @@ const IPGV = IdealPerfectGas{:volume}
     potential_enthalpy(      gas::IPG, (p,T)::PT)     = IPG_enthalpy(gas, IPG_theta(gas, p, T))
     potential_volume(        gas::IPG, (p,T)::PT)     = IPG_pot_volume(gas, p, T)
     temperature(             gas::IPG, (p,s)::PS)     = IPG_temperature_ps(gas, p, s)
+    heat_capacity(           gas::IPG, (p,T)::PT)     = gas.Cp * one(p)
     # routines depending on conservative variable
     #   potential temperature
     conservative_variable(   gas::IPGT, (p,T)::PT) = IPG_theta(gas, p,T)
+    conjugate_variable(      gas::IPGT, (p,T)::PT) = gas.Cp*IPG_exner(gas, p)
     temperature(             gas::IPGT, (p,theta)::PCons) = theta*IPG_exner(gas, p)
     exner_functions(gas::IPGT, (p,theta)::PCons) = let Π = gas.Cp*IPG_exner(gas, p), h = theta*Π
         h, gas.kappa*h*inv(p), Π
@@ -69,6 +71,7 @@ const IPGV = IdealPerfectGas{:volume}
 
     #   potential enthalpy
     conservative_variable(   gas::IPGH, (p,T)::PT) = gas.Cp*IPG_theta(gas, p,T)
+    conjugate_variable(      gas::IPGH, (p,T)::PT) = IPG_exner(gas, p)
     temperature(             gas::IPGH, (p,hpot)::PCons) = gas.inv_Cp*hpot*IPG_exner(gas, p)
     exner_functions(         gas::IPGH, (p,hpot)::PCons) = let exner = IPG_exner(gas, p), h = hpot*exner
         h, gas.kappa*h*inv(p), exner
@@ -82,6 +85,7 @@ const IPGV = IdealPerfectGas{:volume}
     end
     #   entropy
     conservative_variable(gas::IPGS, (p,T)::PT) = IPG_entropy(gas, p,T)
+    conjugate_variable(gas::IPGS, (p,T)::PT) = T * one(p)
     function temperature(gas::IPGS, (p,s)::PCons)
         (; inv_Cp, T0, R, inv_p0) = gas
         return T0*exp(inv_Cp*(s+R*log(p*inv_p0)))

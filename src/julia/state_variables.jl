@@ -37,6 +37,7 @@ const VCons = NamedTuple{(:v, :consvar)}
         temperature,
         pressure,
         conservative_variable,
+        conjugate_variable,
         specific_volume,
         specific_entropy,
         specific_enthalpy,
@@ -81,9 +82,9 @@ for fun in propertynames(all_state_functions())
 end
 
 # fallback implementations of potential temperature, volume, enthalpy
-@inline potential_volume(fluid::SimpleFluid, state::NamedTuple) = specific_volume(fluid, (; p=fluid.p0, s=specific_entropy(fluid, state)))
-@inline potential_temperature(fluid::SimpleFluid, state::NamedTuple) = temperature(fluid, (; p=fluid.p0, s=specific_entropy(fluid, state)))
-@inline potential_enthalpy(fluid::SimpleFluid, state::NamedTuple) = specific_enthalpy(fluid, (; p=fluid.p0, s=specific_entropy(fluid, state)))
+@inline potential_volume(fluid::SimpleFluid, state::NamedTuple)         = specific_volume(fluid, (; p=fluid.p0, s=specific_entropy(fluid, state)))
+@inline potential_temperature(fluid::SimpleFluid, state::NamedTuple)    = temperature(fluid, (; p=fluid.p0, s=specific_entropy(fluid, state)))
+@inline potential_enthalpy(fluid::SimpleFluid, state::NamedTuple)       = specific_enthalpy(fluid, (; p=fluid.p0, s=specific_entropy(fluid, state)))
 
 # helper types to implement the pattern
 #   fluid_pT = fluid(:p, :T)
