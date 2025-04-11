@@ -13,7 +13,6 @@ struct LinearSimpleFluid{CV, F} <: SimpleFluid{F}
     p0::F
     T0::F
     cp0::F
-    ρ0::F
     v0::F
     cs0::F
     βT::F
@@ -22,7 +21,7 @@ struct LinearSimpleFluid{CV, F} <: SimpleFluid{F}
 
     function LinearSimpleFluid(consvar::Symbol, prec)
         @assert consvar in (:entropy, :conservative_temperature)
-        new{consvar, prec}(101325, 273.15, 3986, 1027.0, 9.738e-4, 1490, 1.67e-4, 4.39e-10, 3991.86795711963)
+        new{consvar, prec}(101325, 273.15, 3986, 9.738e-4, 1490, 1.67e-4, 4.39e-10, 3991.86795711963)
     end
 end
 LinearSimpleFluid(params) = LinearSimpleFluid(params.consvar, params.prec)
