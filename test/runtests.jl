@@ -3,7 +3,7 @@ using ForwardDiff
 using ClimFluids
 
 function test()
-    params = (kappa = 2 / 7, Cp = 1000, p0 = 1e5, T0 = 300, nu = 0.1)
+    params = (kappa = 2 / 7, Cp = 1000, p0 = 1e5, T0 = 300, nu = 0.1, v0 = 9.738e-4, α_T = 1.67e-4, α_p = 4.39e-10)
     params = (kappa0 = params.kappa, Cp0 = params.Cp, params...)
 
     p, T = 1.1e5, 275

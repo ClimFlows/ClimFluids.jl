@@ -19,12 +19,12 @@ struct IdealPerfectGas{CV,F} <: PerfectGas{F}
     inv_p0::F
     inv_Cp::F
 
-    function IdealPerfectGas(consvar::Symbol, kappa,Cp,p0,T0)
+    function IdealPerfectGas(consvar::Symbol, kappa, Cp, p0, T0)
         @assert consvar in (:temperature, :entropy, :enthalpy, :volume)
         new{consvar,typeof(kappa)}(kappa, Cp, (1-kappa)*Cp, kappa*Cp, p0, T0, inv(p0), inv(Cp))
     end
 end
-IdealPerfectGas(params) = IdealPerfectGas(params.consvar,params.kappa, params.Cp, params.p0, params.T0)
+IdealPerfectGas(params) = IdealPerfectGas(params.consvar, params.kappa, params.Cp, params.p0, params.T0)
 
 const IPG = IdealPerfectGas
 const IPGT = IdealPerfectGas{:temperature}
@@ -51,7 +51,7 @@ const IPGV = IdealPerfectGas{:volume}
     potential_enthalpy(      gas::IPG, (p,T)::PT)     = IPG_enthalpy(gas, IPG_theta(gas, p, T))
     potential_volume(        gas::IPG, (p,T)::PT)     = IPG_pot_volume(gas, p, T)
     temperature(             gas::IPG, (p,s)::PS)     = IPG_temperature_ps(gas, p, s)
-    heat_capacity(           gas::IPG, (p,T)::PT)     = gas.Cp * one(p)
+    heat_capacity(           gas::IPG, (p,T)::PT)     = gas.Cp * one(T)
     # routines depending on conservative variable
     #   potential temperature
     conservative_variable(   gas::IPGT, (p,T)::PT) = IPG_theta(gas, p,T)
