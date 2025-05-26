@@ -59,8 +59,8 @@ const LSFP  = LinearSimpleFluid{:potential_temperature}
     # Defined here only:
     specific_gibbs(             fluid::LSF, (p, T)::PT)     = LSF_gibbs_from_pθ(fluid, p, LSF_θ(fluid, p, T))
     specific_volume(            fluid::LSF, (p, T)::PT)     = LSF_specific_volume_from_pθ(fluid, p, LSF_θ(fluid, p, T))
+    specific_entropy(           fluid::LSF, (p, θ)::PTh)    = LSF_entropy_from_θ(fluid, θ)
 
-    
     ## consvar = :entropy
 
     # PT
@@ -123,12 +123,13 @@ const LSFP  = LinearSimpleFluid{:potential_temperature}
     ## Fallback: convert to (p, T) if not implemented above
     canonical_state(fluid::LSF, (p, consvar)::PCons)        = (p, T = temperature(fluid, (; p, consvar)))
     canonical_state(fluid::LSF, (p, s)::PS)                 = (p, T = LSF_temperature_pθ(fluid, p, LSF_θ_from_entropy(fluid, s)))
+    canonical_state(fluid::LSF, (p, θ)::PTh)                = (p, T = LSF_temperature_pθ(fluid, p, θ))
     canonical_state(fluid::LSF, (p, v)::PV)                 = (p, T = LSF_temperature_pθ(fluid, p, LSF_θ_from_pv(fluid, p, v)))
     canonical_state(fluid::LSF, (v, T)::VT)                 = (p = pressure(fluid, (; v, T)), T)
     canonical_state(fluid::LSF, (v, s)::VS)                 = canonical_state_LSF_vs(fluid, (v, s))
     canonical_state(fluid::LSFS, (v, s)::VCons)             = canonical_state_LSF_vs(fluid, (v, s))
     canonical_state(fluid::LSFP, (v, θ)::VCons)             = canonical_state_LSF_vθ(fluid, (v, θ))
-    
+
     function canonical_state_LSF_vs(fluid, (v, s))
         θ = LSF_θ_from_entropy(fluid, s)
         p = LSF_pressure_from_vθ(fluid, v, θ)
