@@ -30,7 +30,7 @@ const LSFP  = LinearSimpleFluid{:potential_temperature}
     solve_quadratic(a, b, c) = (-b + sqrt(b^2 - 4*a*c)) / (2*a)
 
     LSF_θ((; v0, α_T, p0, Cp), p, T)                                = T / ( 1 + v0 * α_T * ( p - p0 ) / Cp )
-    LSF_temperature_pθ((; v0, α_T, p0, Cp), p, θ)                   = θ * ( 1 + v0 * α_T * ( p - p0 ) / Cp )
+    LSF_temperature_from_pθ((; v0, α_T, p0, Cp), p, θ)              = θ * ( 1 + v0 * α_T * ( p - p0 ) / Cp )
     LSF_entropy_from_θ((; Cp, T0), θ)                               = Cp * log( θ  / T0 )
     LSF_θ_from_entropy((; T0, Cp), s)                               = T0 * exp(s / Cp)
     LSF_specific_volume_from_pθ((; v0, p0, T0, α_T, α_p), p, θ)     = v0 * ( 1 + α_T * ( θ - T0 ) - α_p * ( p - p0 ) )
@@ -41,7 +41,7 @@ const LSFP  = LinearSimpleFluid{:potential_temperature}
     LSF_pressure_from_vT((; Cp, T0, v0, α_T, p0, α_p), v, T)        = p0 + solve_quadratic(v0 * α_T * α_p, α_p * Cp + α_T^2 * T0 * v0 + α_T * ( v - v0 ), α_T * Cp * (T0 - T) + Cp * ( v/v0 - 1 ) )
     LSF_θ_from_pv((; Cp, T0, v0, α_T, p0, α_p), p, v)               = T0 + ( v / v0 - 1 + α_p * (p - p0) ) / α_T
     LSF_enthalpy_from_pθ((; Cp, T0, v0, α_T, p0, α_p), p, θ)        = Cp * (θ - T0) + v0 * (1 + α_T * (θ - T0)) * (p - p0) - 0.5 * v0 * α_p * (p - p0)^2
-    LSF_gibbs_from_pθ((; Cp, T0, v0, α_T, p0, α_p), p, θ)           = LSF_enthalpy_from_pθ((; Cp, T0, v0, α_T, p0, α_p), p, θ) - LSF_temperature_pθ((; v0, α_T, p0, Cp), p, θ) * LSF_entropy_from_θ((; Cp, T0), θ)
+    LSF_gibbs_from_pθ((; Cp, T0, v0, α_T, p0, α_p), p, θ)           = LSF_enthalpy_from_pθ((; Cp, T0, v0, α_T, p0, α_p), p, θ) - LSF_temperature_from_pθ((; v0, α_T, p0, Cp), p, θ) * LSF_entropy_from_θ((; Cp, T0), θ)
     LSF_internal_energy_from_pθ((; Cp, T0, v0, α_T, p0, α_p), p, θ) = LSF_enthalpy_from_pθ((; Cp, T0, v0, α_T, p0, α_p), p, θ) - p * LSF_specific_volume_from_pθ((; v0, p0, T0, α_T, α_p), p, θ)
     LSF_temperature_vs((; Cp, T0, v0, α_T, p0, α_p), v, s)          = T0 *  exp( s / Cp ) * ( 1 + (v0 * α_T / (Cp * α_p) ) * ( 1 - v/v0 + α_T * T0 * (exp(s / Cp) - 1) ) )
     LSF_exner((; v0, α_T, p0, Cp), p, T)                            = Cp * T / LSF_θ((; v0, α_T, p0, Cp), p, T)
@@ -69,14 +69,14 @@ const LSFP  = LinearSimpleFluid{:potential_temperature}
     conjugate_variable(     fluid::LSFS, (p, T)::PT)        = T
 
     # PCons
-    temperature(        fluid::LSFS, (p, s)::PCons)         = LSF_temperature_pθ(fluid, p, LSF_θ_from_entropy(fluid, s))
+    temperature(        fluid::LSFS, (p, s)::PCons)         = LSF_temperature_from_pθ(fluid, p, LSF_θ_from_entropy(fluid, s))
     specific_enthalpy(  fluid::LSFS, (p, s)::PCons)         = LSF_enthalpy_from_pθ(fluid, p, LSF_θ_from_entropy(fluid, s))
     specific_volume(    fluid::LSFS, (p, s)::PCons)         = LSF_specific_volume_from_pθ(fluid, p, LSF_θ_from_entropy(fluid, s))
     heat_capacity(      fluid::LSFS, (p, s)::PCons)         = LSF_heat_capacity_s(fluid, s)
 
     function exner_functions(fluid::LSFS, (p, s)::PCons)    # returns h, v, conjvar = T
         θ = LSF_θ_from_entropy(fluid, s)
-        T = LSF_temperature_pθ(fluid, p, θ)
+        T = LSF_temperature_from_pθ(fluid, p, θ)
         h = LSF_enthalpy_from_pθ(fluid, p, θ)
         v = LSF_specific_volume_from_pθ(fluid, p, θ)
         return h, v, T
@@ -101,7 +101,7 @@ const LSFP  = LinearSimpleFluid{:potential_temperature}
     conjugate_variable(     fluid::LSFP, (p, T)::PT)        = LSF_exner(fluid, p, T)
 
     # PCons
-    temperature(        fluid::LSFP, (p, θ)::PCons)         = LSF_temperature_pθ(fluid, p, θ)
+    temperature(        fluid::LSFP, (p, θ)::PCons)         = LSF_temperature_from_pθ(fluid, p, θ)
     specific_enthalpy(  fluid::LSFP, (p, θ)::PCons)         = LSF_enthalpy_from_pθ(fluid, p, θ)
     specific_volume(    fluid::LSFP, (p, θ)::PCons)         = LSF_specific_volume_from_pθ(fluid, p, θ)
     heat_capacity(      fluid::LSFP, (p, θ)::PCons)         = LSF_heat_capacity_s(fluid, θ)
@@ -109,7 +109,7 @@ const LSFP  = LinearSimpleFluid{:potential_temperature}
     function exner_functions(fluid::LSFP, (p, θ)::PCons)    # returns h, v, conjvar = Cp0_ct * T / θ
         h = LSF_enthalpy_from_pθ(fluid, p, θ)
         v = LSF_specific_volume_from_pθ(fluid, p, θ)
-        conjvar = fluid.Cp * LSF_temperature_pθ(fluid, p, θ) / θ
+        conjvar = fluid.Cp * LSF_temperature_from_pθ(fluid, p, θ) / θ
         return h, v, conjvar
     end
     function volume_functions(fluid::LSFP, (p, θ)::PCons)   # returns v, ∂v/∂p, ∂v/∂θ
@@ -125,9 +125,9 @@ const LSFP  = LinearSimpleFluid{:potential_temperature}
 
     ## Fallback: convert to (p, T) if not implemented above
     canonical_state(fluid::LSF, (p, consvar)::PCons)        = (p, T = temperature(fluid, (; p, consvar)))
-    canonical_state(fluid::LSF, (p, s)::PS)                 = (p, T = LSF_temperature_pθ(fluid, p, LSF_θ_from_entropy(fluid, s)))
-    canonical_state(fluid::LSF, (p, θ)::PTh)                = (p, T = LSF_temperature_pθ(fluid, p, θ))
-    canonical_state(fluid::LSF, (p, v)::PV)                 = (p, T = LSF_temperature_pθ(fluid, p, LSF_θ_from_pv(fluid, p, v)))
+    canonical_state(fluid::LSF, (p, s)::PS)                 = (p, T = LSF_temperature_from_pθ(fluid, p, LSF_θ_from_entropy(fluid, s)))
+    canonical_state(fluid::LSF, (p, θ)::PTh)                = (p, T = LSF_temperature_from_pθ(fluid, p, θ))
+    canonical_state(fluid::LSF, (p, v)::PV)                 = (p, T = LSF_temperature_from_pθ(fluid, p, LSF_θ_from_pv(fluid, p, v)))
     canonical_state(fluid::LSF, (v, T)::VT)                 = (p = pressure(fluid, (; v, T)), T)
     canonical_state(fluid::LSF, (v, s)::VS)                 = canonical_state_LSF_vs(fluid, (v, s))
     canonical_state(fluid::LSFS, (v, s)::VCons)             = canonical_state_LSF_vs(fluid, (v, s))
@@ -136,13 +136,13 @@ const LSFP  = LinearSimpleFluid{:potential_temperature}
     function canonical_state_LSF_vs(fluid, (v, s))
         θ = LSF_θ_from_entropy(fluid, s)
         p = LSF_pressure_from_vθ(fluid, v, θ)
-        T = LSF_temperature_pθ(fluid, p, θ)
+        T = LSF_temperature_from_pθ(fluid, p, θ)
         return (; p, T)
     end
 
     function canonical_state_LSF_vθ(fluid, (v, θ))
         p = LSF_pressure_from_vθ(fluid, v, θ)
-        T = LSF_temperature_pθ(fluid, p, θ)
+        T = LSF_temperature_from_pθ(fluid, p, θ)
         return (; p, T)
     end
 
