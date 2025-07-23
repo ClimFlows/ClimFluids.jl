@@ -3,12 +3,18 @@ const PS = NamedTuple{(:p, :s)}
 const PT = NamedTuple{(:p, :T)}
 const PTh = NamedTuple{(:p, :theta)}
 const PCons = NamedTuple{(:p, :consvar)}
-const PTQ = NamedTuple{(:p, :T, :q)}
-const PVQ = NamedTuple{(:p, :v, :q)}
-const PConsQ = NamedTuple{(:p, :consvar, :q)}
 const VT = NamedTuple{(:v, :T)}
 const VS = NamedTuple{(:v, :s)}
 const VCons = NamedTuple{(:v, :consvar)}
+
+const PVQ = NamedTuple{(:p, :v, :q)}
+const PSQ = NamedTuple{(:p, :s, :q)}
+const PTQ = NamedTuple{(:p, :T, :q)}
+const PThQ = NamedTuple{(:p, :theta, :q)}
+const PConsQ = NamedTuple{(:p, :consvar, :q)}
+const VTQ = NamedTuple{(:v, :T, :q)}
+const VSQ = NamedTuple{(:v, :s, :q)}
+const VConsQ = NamedTuple{(:v, :consvar, :q)}
 
 @inlineall begin
 
@@ -17,6 +23,7 @@ const VCons = NamedTuple{(:v, :consvar)}
         (:p, :T, :q),
         (:p, :s, :q),
         (:p, :consvar, :q),
+        (:p, :theta, :q),
         (:v, :T, :q),
         (:v, :s, :q),
         (:v, :consvar, :q),
@@ -48,7 +55,7 @@ const VCons = NamedTuple{(:v, :consvar)}
         exner_functions,
         volume_functions,
         sound_speed2,
-        sound_speed,
+        sound_speed
     )
 
     # one could imagine to specialize this function to restrict the list
