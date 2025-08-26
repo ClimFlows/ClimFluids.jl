@@ -36,19 +36,19 @@ const LBFP  = LinearBinaryFluid{:potential_temperature}
     LBF_temperature_from_pθ((; v0, α_T, p0, Cp), p, θ)                              = θ * ( 1 + v0 * α_T * ( p - p0 ) / Cp )
     LBF_entropy_from_θ((; Cp, T0), θ)                                               = Cp * log( θ  / T0 )
     LBF_θ_from_entropy((; T0, Cp), s)                                               = T0 * exp(s / Cp)
-    LBF_specific_volume_from_pθS((; v0, p0, T0, α_T, α_p, α_S), p, θ, q)             = v0 * ( 1 + α_T * ( θ - T0 ) - α_S * (q - S0) - α_p * ( p - p0 ) )
-    LBF_sound_speed2((; v0, α_p), T)                                                = (v0 / α_p) * one(T)
+    LBF_specific_volume_from_pθS((; v0, p0, T0, α_T, α_p, α_S, S0), p, θ, q)        = v0 * ( 1 + α_T * ( θ - T0 ) - α_S * (q - S0) - α_p * ( p - p0 ) )
+    LBF_sound_speed2((; v0, p0, T0, α_T, α_p, α_S, S0), p, θ, q)                    = LBF_specific_volume_from_pθS((; v0, p0, T0, α_T, α_p, α_S, S0), p, θ, q)^2 / (v0 * α_p)
     LBF_heat_capacity((; Cp), T)                                                    = Cp * one(T)
     LBF_heat_capacity_s((; Cp), s)                                                  = Cp * one(s)
-    LBF_pressure_from_vθS((; p0, T0, v0, α_T, α_p, α_S), v, θ, q)                   = p0 + ( α_T * (θ - T0) - α_S * (q - S0) +  1 - v / v0 ) / α_p  
-    LBF_pressure_from_vTS((; Cp, T0, v0, α_T, p0, α_p, α_S), v, T, q)               = p0 + solve_quadratic(v0 * α_T * α_p, α_p * Cp + α_T^2 * T0 * v0 + α_T * ( v - v0 ) + v0 * α_T * α_S * ( q - S0 ), Cp * (α_S * (q - S0) - α_T * (T - T0) + ( v/v0 - 1 )))
-    LBF_θ_from_pvS((; Cp, T0, v0, α_T, p0, α_p, α_S), p, v, q)                      = T0 + ( v / v0 - 1 + α_p * (p - p0) + α_S * (q - S0) ) / α_T
+    LBF_pressure_from_vθS((; p0, T0, v0, α_T, α_p, α_S, S0), v, θ, q)                   = p0 + ( α_T * (θ - T0) - α_S * (q - S0) +  1 - v / v0 ) / α_p  
+    LBF_pressure_from_vTS((; Cp, T0, v0, α_T, p0, α_p, α_S, S0), v, T, q)               = p0 + solve_quadratic(v0 * α_T * α_p, α_p * Cp + α_T^2 * T0 * v0 + α_T * ( v - v0 ) + v0 * α_T * α_S * ( q - S0 ), Cp * (α_S * (q - S0) - α_T * (T - T0) + ( v/v0 - 1 )))
+    LBF_θ_from_pvS((; Cp, T0, v0, α_T, p0, α_p, α_S, S0), p, v, q)                      = T0 + ( v / v0 - 1 + α_p * (p - p0) + α_S * (q - S0) ) / α_T
     LBF_enthalpy_from_pθS((; Cp, T0, S0, v0, α_T, p0, α_p, α_S, μ0), p, θ, q)           = Cp * (θ - T0) + μ0 * (q - S0) + v0 * (1 + α_T * (θ - T0) - α_S * (q - S0)) * (p - p0) - 0.5 * v0 * α_p * (p - p0)^2
     LBF_gibbs_from_pθS((; Cp, T0, v0, α_T, p0, α_p, α_S, μ0), p, θ, q)              = LBF_enthalpy_from_pθS((; Cp, T0, v0, α_T, p0, α_p), p, θ, q) - LBF_temperature_from_pθ((; v0, α_T, p0, Cp), p, θ) * LBF_entropy_from_θ((; Cp, T0), θ)
-    LBF_internal_energy_from_pθS((; Cp, T0, v0, α_T, p0, α_p, α_S, μ0), p, θ, q)    = LBF_enthalpy_from_pθS((; Cp, T0, v0, α_T, p0, α_p, α_S, μ0), p, θ, q) - p * LBF_specific_volume_from_pθS((; v0, p0, T0, α_T, α_p, α_S), p, θ, q)
-    LBF_temperature_vsS((; Cp, T0, v0, α_T, p0, α_p), v, s, q)                      = T0 * exp(s / Cp) * ( 1 + (v0 * α_T / (Cp * α_p) ) * ( 1 - v/v0  - α_S * (q - S0) + α_T * T0 * (exp(s / Cp) - 1) ) )
+    LBF_internal_energy_from_pθS((; Cp, T0, v0, α_T, p0, α_p, α_S, μ0, S0), p, θ, q)    = LBF_enthalpy_from_pθS((; Cp, T0, v0, α_T, p0, α_p, α_S, μ0, S0), p, θ, q) - p * LBF_specific_volume_from_pθS((; v0, p0, T0, α_T, α_p, α_S, S0), p, θ, q)
+    LBF_temperature_vsS((; Cp, T0, v0, α_T, p0, α_p, α_S, S0), v, s, q)                      = T0 * exp(s / Cp) * ( 1 + (v0 * α_T / (Cp * α_p) ) * ( 1 - v/v0  - α_S * (q - S0) + α_T * T0 * (exp(s / Cp) - 1) ) )
     LBF_exner((; v0, α_T, p0, Cp), p, T)                                            = Cp * T / LBF_θ((; v0, α_T, p0, Cp), p, T)
-    LBF_chemical_potential((; μ0, v0, α_S, p0), p, q)                               = μ0 * one(q) - v0 * α_S * ( p - p0 * one(q) )
+    LBF_chemical_potential((; μ0, v0, α_S, p0), p, q)                               = μ0 * one(q) - v0 * α_S * ( p - p0 ) * one(q)
     LBF_ds_dq(s) = zero(s)
     LBF_dθ_ds((; Cp), θ) = θ * inv(Cp)
     LBF_dθ_dq(θ) = zero(θ)
@@ -58,12 +58,12 @@ const LBFP  = LinearBinaryFluid{:potential_temperature}
     specific_entropy(           fluid::LBF, (p, T, q)::PTQ)    = LBF_entropy_from_θ(fluid, LBF_θ(fluid, p, T))
     specific_enthalpy(          fluid::LBF, (p, T, q)::PTQ)    = LBF_enthalpy_from_pθS(fluid, p, LBF_θ(fluid, p, T), q)
     specific_internal_energy(   fluid::LBF, (p, T, q)::PTQ)    = LBF_internal_energy_from_pθS(fluid, p, LBF_θ(fluid, p, T), q)
-    sound_speed2(               fluid::LBF, (p, T, q)::PTQ)    = LBF_sound_speed2(fluid, T)
     potential_temperature(      fluid::LBF, (p, T, q)::PTQ)    = LBF_θ(fluid, p, T)
     potential_enthalpy(         fluid::LBF, (p, T, q)::PTQ)    = LBF_enthalpy_from_pθS(fluid, fluid.p0, LBF_θ(fluid, p, T), q)
     potential_volume(           fluid::LBF, (p, T, q)::PTQ)    = LBF_specific_volume_from_pθS(fluid, fluid.p0, LBF_θ(fluid, p, T), q)
     heat_capacity(              fluid::LBF, (p, T, q)::PTQ)    = LBF_heat_capacity(fluid, T)
     pressure(                   fluid::LBF, (v, T, q)::VTQ)    = LBF_pressure_from_vTS(fluid, v, T, q)
+    sound_speed2(               fluid::LBF, (p, T, q)::PTQ)    = LBF_sound_speed2(fluid, p, LBF_θ(fluid, p, T), q)
     
     # Defined here only:
     specific_gibbs(             fluid::LBF, (p, T, q)::PTQ)    = LBF_gibbs_from_pθS(fluid, p, LBF_θ(fluid, p, T), q)
@@ -71,6 +71,7 @@ const LBFP  = LinearBinaryFluid{:potential_temperature}
     specific_entropy(           fluid::LBF, (p, θ, q)::PThQ)   = LBF_entropy_from_θ(fluid, θ)
     chemical_potential(         fluid::LBF, (p, T, q)::PTQ)    = LBF_chemical_potential(fluid, p, q)
     ds_dq(                      fluid::LBF, (p, s, q)::PSQ)    = LBF_ds_dq(s)
+    
     ## consvar = :entropy
 
     # PTQ
@@ -103,8 +104,8 @@ const LBFP  = LinearBinaryFluid{:potential_temperature}
     end
     
     # VConsQ
-    temperature(    fluid::LBFS, (v, s)::VConsQ)  = LBF_temperature_vsS(fluid, v, s, q)
-    pressure(       fluid::LBFS, (v, s)::VConsQ)  = LBF_pressure_from_vθS(fluid, v, LBF_θ_from_entropy(fluid, s), q)
+    temperature(    fluid::LBFS, (v, s, q)::VConsQ)  = LBF_temperature_vsS(fluid, v, s, q)
+    pressure(       fluid::LBFS, (v, s, q)::VConsQ)  = LBF_pressure_from_vθS(fluid, v, LBF_θ_from_entropy(fluid, s), q)
     
     
     ## consvar = :potential_temperature
@@ -120,9 +121,9 @@ const LBFP  = LinearBinaryFluid{:potential_temperature}
     specific_volume(    fluid::LBFP, (p, θ, q)::PConsQ)        = LBF_specific_volume_from_pθS(fluid, p, θ, q)
     heat_capacity(      fluid::LBFP, (p, θ, q)::PConsQ)        = LBF_heat_capacity_s(fluid, θ)
     modified_chemical_potential(fluid::LBFP, (p, θ, q)::PConsQ)   = LBF_chemical_potential(fluid, p, q)
-    dcons_dq(               fluid::LBFP, (p, θ, q)::PConsQ)   = LBF_dθ_ds(fluid, θ) * LBF_ds_dq(LBF_entropy_from_θ(fluid, θ)) + LBF_dθ_dq(θ)
+    dcons_dq(               fluid::LBFP, (p, θ, q)::PConsQ)   = zero(q)
 
-    function exner_functions(fluid::LBFP, (p, θ, q)::PConsQ)    # returns h, v, conjvar = Cp0_ct * T / θ
+    function exner_functions(fluid::LBFP, (p, θ, q)::PConsQ)    # returns h, v, conjvar = Cp0 * T / θ
         h = LBF_enthalpy_from_pθS(fluid, p, θ, q)
         v = LBF_specific_volume_from_pθS(fluid, p, θ, q)
         conjvar = fluid.Cp * LBF_temperature_from_pθ(fluid, p, θ) / θ
@@ -132,7 +133,7 @@ const LBFP  = LinearBinaryFluid{:potential_temperature}
         v = LBF_specific_volume_from_pθS(fluid, p, θ, q)
         dv_dp = -fluid.v0 * fluid.α_p
         dv_dθ = fluid.v0 * fluid.α_T
-        dv_dS = fluid.v0 * fluid.α_S
+        dv_dS = -fluid.v0 * fluid.α_S
         return v, dv_dp, dv_dθ, dv_dS
     end
 
@@ -140,11 +141,12 @@ const LBFP  = LinearBinaryFluid{:potential_temperature}
     temperature(    fluid::LBFP, (v, θ, q)::VConsQ)    = LBF_temperature_vsS(fluid, v, LBF_entropy_from_θ(fluid, θ), q)
     pressure(       fluid::LBFP, (v, θ, q)::VConsQ)    = LBF_pressure_from_vθS(fluid, v, θ, q)
 
-    ## Fallback: convert to (p, T) if not implemented above
+    ## Fallback: convert to (p, T, q) if not implemented above
+    canonical_state(fluid::LBF, (p, T, q)::PTQ)                 = (p = p, T = T, q = q)
     canonical_state(fluid::LBF, (p, consvar, q)::PConsQ)        = (p, T = temperature(fluid, (; p, consvar, q)), q)
     canonical_state(fluid::LBF, (p, s, q)::PSQ)                 = (p, T = LBF_temperature_from_pθ(fluid, p, LBF_θ_from_entropy(fluid, s)), q)
     canonical_state(fluid::LBF, (p, θ, q)::PThQ)                = (p, T = LBF_temperature_from_pθ(fluid, p, θ), q)
-    canonical_state(fluid::LBF, (p, v, q)::PVQ)                 = (p, T = LBF_temperature_from_pθ(fluid, p, LBF_θ_from_pv(fluid, p, v)), q)
+    canonical_state(fluid::LBF, (p, v, q)::PVQ)                 = (p, T = LBF_temperature_from_pθ(fluid, p, LBF_θ_from_pvS(fluid, p, v, q)), q)
     canonical_state(fluid::LBF, (v, T, q)::VTQ)                 = (p = pressure(fluid, (; v, T, q)), T, q)
     canonical_state(fluid::LBF, (v, s, q)::VSQ)                 = canonical_state_LBF_vs(fluid, (v, s, q))
     canonical_state(fluid::LBFS, (v, s, q)::VConsQ)             = canonical_state_LBF_vs(fluid, (v, s, q))
@@ -152,13 +154,13 @@ const LBFP  = LinearBinaryFluid{:potential_temperature}
 
     function canonical_state_LBF_vs(fluid, (v, s, q))
         θ = LBF_θ_from_entropy(fluid, s)
-        p = LBF_pressure_from_vθ(fluid, v, θ)
+        p = LBF_pressure_from_vθS(fluid, v, θ, q)
         T = LBF_temperature_from_pθ(fluid, p, θ)
         return (; p, T, q)
     end
 
     function canonical_state_LBF_vθ(fluid, (v, θ, q))
-        p = LBF_pressure_from_vθ(fluid, v, θ)
+        p = LBF_pressure_from_vθS(fluid, v, θ, q)
         T = LBF_temperature_from_pθ(fluid, p, θ)
         return (; p, T, q)
     end

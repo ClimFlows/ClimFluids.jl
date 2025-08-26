@@ -75,6 +75,9 @@ const VConsQ = NamedTuple{(:v, :consvar, :q)}
     temperature(::SimpleFluid, (v,T)::VT) = T
     pressure(::SimpleFluid, (p,T)::PT) = p
 
+    temperature(::BinaryFluid, (p,T,q)::PTQ) = T
+    temperature(::BinaryFluid, (v,T,q)::VTQ) = T
+    pressure(::BinaryFluid, (p,T,q)::PTQ) = p
 end
 
 # fallback, only sound_speed2 needs to be implemented
@@ -117,8 +120,11 @@ end
 
 @inlineall begin
 
-    (fluid::AbstractFluid)(v1::Symbol, v2::Symbol) =
+    (fluid::SimpleFluid)(v1::Symbol, v2::Symbol) =
         FluidWithVars{(v1, v2),typeof(fluid)}(fluid)
+
+    (fluid::BinaryFluid)(v1::Symbol, v2::Symbol, v3::Symbol) =
+        FluidWithVars{(v1, v2, v3),typeof(fluid)}(fluid)
 
     Base.propertynames(fluid::FluidWithVars{vars}) where {vars} =
         propertynames(state_functions(fluid.fluid))
@@ -135,5 +141,10 @@ end
         state_fun = getfield(state_functions(fluid), fun)
         return state_fun(fluid, args)
     end
-
+    function (fluid_fun::StateFunction{vars,fun})(v1, v2, v3) where {vars,fun}
+        args = NamedTuple{vars}((v1, v2, v3))
+        fluid = fluid_fun.fluid
+        state_fun = getfield(state_functions(fluid), fun)
+        return state_fun(fluid, args)
+    end
 end

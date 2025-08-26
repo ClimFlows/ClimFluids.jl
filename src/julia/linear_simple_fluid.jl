@@ -45,6 +45,7 @@ const LSFP  = LinearSimpleFluid{:potential_temperature}
     LSF_internal_energy_from_pθ((; Cp, T0, v0, α_T, p0, α_p), p, θ) = LSF_enthalpy_from_pθ((; Cp, T0, v0, α_T, p0, α_p), p, θ) - p * LSF_specific_volume_from_pθ((; v0, p0, T0, α_T, α_p), p, θ)
     LSF_temperature_vs((; Cp, T0, v0, α_T, p0, α_p), v, s)          = T0 *  exp( s / Cp ) * ( 1 + (v0 * α_T / (Cp * α_p) ) * ( 1 - v/v0 + α_T * T0 * (exp(s / Cp) - 1) ) )
     LSF_exner((; v0, α_T, p0, Cp), p, T)                            = Cp * T / LSF_θ((; v0, α_T, p0, Cp), p, T)
+    
     ## all consvar
     # Defined throughout ClimFluids:
     specific_entropy(           fluid::LSF, (p, T)::PT)     = LSF_entropy_from_θ(fluid, LSF_θ(fluid, p, T))

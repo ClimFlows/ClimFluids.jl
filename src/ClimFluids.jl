@@ -1,5 +1,6 @@
 module ClimFluids
 using MuladdMacro
+using PolynomialRoots
 
 export AbstractFluid, IdealPerfectGas, CpVarPerfectGas
 export temperature,
@@ -145,6 +146,7 @@ include("julia/ideal.jl")
 include("julia/lebonnois.jl")
 include("julia/linear_simple_fluid.jl")
 include("julia/linear_binary_fluid.jl")
+include("julia/nonlinear_binary_fluid.jl")
 include("julia/binarygas.jl")
 
 @inline pow_fast(x, y) = @fastmath exp(y * log(x))
