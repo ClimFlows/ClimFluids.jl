@@ -110,7 +110,7 @@ function test_state_functions(fluid::BinaryFluid, p, T, q)
             val = fun(fluid, state)
             # @btime $fun($fluid, $state)
             for state in states
-                @info "state: $state"
+                # @info "state: $state"
                 @test fun(fluid, state) ≈ val
                 # @btime $fun($fluid, $state)
             end

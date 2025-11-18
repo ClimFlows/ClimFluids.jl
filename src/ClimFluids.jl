@@ -2,11 +2,11 @@ module ClimFluids
 using MuladdMacro
 using PolynomialRoots
 
-export AbstractFluid, IdealPerfectGas, CpVarPerfectGas
+export AbstractFluid, IdealPerfectGas, CpVarPerfectGas, NonlinearBinaryFluid
 export temperature,
     specific_entropy, specific_volume, specific_enthalpy, specific_internal_energy
 export potential_temperature, conservative_variable, exner_functions
-export sound_speed, components
+export sound_speed, sound_speed2, components
 
 # By default, dot expressions treat user-defined types as iterators, not scalars.
 # Derive your types from this abstract type if you want
