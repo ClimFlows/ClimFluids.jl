@@ -14,14 +14,11 @@ function test()
     CPV = ClimFluids.VarCpPerfectGas
     
     # liquid:
-    LSF = ClimFluids.LinearSimpleFluid
-    LBF = ClimFluids.LinearBinaryFluid
     NBF = ClimFluids.NonlinearBinaryFluid
+    
     consvars_single_gas = Dict( IPG => (:temperature, :entropy, :enthalpy), 
                                 CPV => (:temperature,))
-    consvars_single_liquid = Dict(  LSF => (:entropy, :potential_temperature))
-    consvars_binary_liquid = Dict(  LBF => (:entropy, :potential_temperature),
-                                    NBF => (:potential_temperature,))
+    consvars_binary_liquid = Dict( NBF => (:entropy, :potential_temperature))
     
     prec = Float64
     params_gas      = map(prec, params_gas)
@@ -34,11 +31,6 @@ function test()
     for Fluid in keys(consvars_single_gas)
         for consvar in consvars_single_gas[Fluid]
             ClimFluids.test_fluid(Fluid((; consvar, params_gas...)), p, T)
-        end
-    end
-    for Fluid in keys(consvars_single_liquid)
-        for consvar in consvars_single_liquid[Fluid]
-            ClimFluids.test_fluid(Fluid((; consvar, params_water...)), p, T)
         end
     end
     for Fluid in keys(consvars_binary_liquid)
