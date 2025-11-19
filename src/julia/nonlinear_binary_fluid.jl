@@ -22,10 +22,9 @@ struct NonlinearBinaryFluid{CV, F} <: BinaryFluid{F}
     M_s::F
     R::F
     R_s::F
-    Cp0::F
     function NonlinearBinaryFluid(consvar::Symbol, (; p0, T0, q0, v0, Cp, α_T, α_q, α_p, α_TT, γ, R, M_s))
         @assert consvar in (:entropy, :potential_temperature)
-        new{consvar, typeof(p0)}(p0, T0, q0, v0, Cp, α_T, α_q, α_p, α_TT, γ, M_s, R, R/M_s, 3991.86795711963)
+        new{consvar, typeof(p0)}(p0, T0, q0, v0, Cp, α_T, α_q, α_p, α_TT, γ, M_s, R, R/M_s)
     end
 end
 NonlinearBinaryFluid(params) = NonlinearBinaryFluid(params.consvar, params)
@@ -33,10 +32,8 @@ NonlinearBinaryFluid(params) = NonlinearBinaryFluid(params.consvar, params)
 const NBF   = NonlinearBinaryFluid
 const NBFS  = NonlinearBinaryFluid{:entropy}
 const NBFP  = NonlinearBinaryFluid{:potential_temperature}
-# const NBFC  = NonlinearBinaryFluid{:conservative_temperature}
 
 const PVCons = NamedTuple{(:p, :v, :consvar)}
-
 
 @fastmath @muladd @inlineall begin
     ## private functions
@@ -90,15 +87,15 @@ const PVCons = NamedTuple{(:p, :v, :consvar)}
     NBF_∂θ_∂q(fluid, s, q) = - NBF_∂s_mix_∂q(fluid, q) * NBF_θ_sq(fluid, s, q) / fluid.Cp
     # s(θ, q)
     NBF_s_θq(fluid, θ, q) = NBF_s_mix(fluid, q) + fluid.Cp * log(θ / fluid.T0)
-    # s_mix(q) (q in g/kg)
+    # s_mix(q) (q in kg/kg)
     function NBF_s_mix(fluid::NonlinearBinaryFluid{CV, F}, q) where {CV, F}
         (; R_s) = fluid
-        return - R_s * ( xlnx(q/1000, F) - q/1000 )
+        return - R_s * ( xlnx(q, F) - q )
     end
     # s_mix'(q)
-    NBF_∂s_mix_∂q((; R_s), q) = - R_s * log(q / 1000 )
+    NBF_∂s_mix_∂q((; R_s), q) = - R_s * log(q )
     # s_mix''(q)
-    NBF_∂s_mix_∂qq((; R_s), q) = - 1000 * R_s / q
+    NBF_∂s_mix_∂qq((; R_s), q) = - R_s / q
     # v(p, θ, q) = ∂h/∂p(p, θ, q)
     NBF_v_pθq((; p0, T0, q0, v0, α_p, α_T, α_q, γ, α_TT), p, θ, q) = v0 * ( 1 + α_T * (1 + γ * (p - p0)) * (θ - T0) - α_q * (q - q0) - α_p * (p - p0) + 0.5 * α_TT * (θ - T0)^2 )
     # ∂v/∂p(p, θ, q)
