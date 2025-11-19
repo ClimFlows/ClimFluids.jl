@@ -112,7 +112,7 @@ const PVCons = NamedTuple{(:p, :v, :consvar)}
     # c2(p, θ, q)
     NBF_c2_pθq((; p0, T0, q0, v0, α_p, α_T, α_q, γ, α_TT), p, θ, q) = - NBF_v_pθq((; p0, T0, q0, v0, α_p, α_T, α_q, γ, α_TT), p, θ, q)^2 / NBF_∂v_∂p((; v0, α_p, α_T, γ, T0), θ)
     # μ(p, θ, q) = ∂h/∂q(p, s, q) = ∂h/∂q(p, θ, q) + ∂h/∂θ(p, θ, q) ∂θ/∂q(s, q)
-    NBF_chemical_potential_pθq((; v0, p0, T0, α_T, α_q, γ, α_TT, R_s, Cp), p, θ, q) = - v0 * α_q * (p - p0) - NBF_s_mix_dq((; R_s), q) * NBF_T_pθ((; v0, Cp, α_T, γ, α_TT, p0, T0), p, θ)
+    NBF_chemical_potential_pθq((; v0, p0, T0, α_T, α_q, γ, α_TT, R_s, Cp), p, θ, q) = - v0 * α_q * (p - p0) - NBF_∂s_mix_∂q((; R_s), q) * NBF_T_pθ((; v0, Cp, α_T, γ, α_TT, p0, T0), p, θ)
     # μθ(p, θ, q) = ∂h/∂q(p, θ, q)
     NBF_modified_chemical_potential_pq((; v0, α_q, p0), p, q) = - v0 * α_q * (p - p0) * one(q)
     # q(p, v, θ) 
@@ -136,6 +136,14 @@ const PVCons = NamedTuple{(:p, :v, :consvar)}
     chemical_potential(         fluid::NBF, (p, T, q)::PTQ)     = NBF_chemical_potential_pθq(fluid, p, NBF_θ_pT(fluid, p, T), q)
     specific_entropy(           fluid::NBF, (p, θ, q)::PThQ)    = NBF_s_θq(fluid, θ, q)
 
+    function chemical_potential_derivatives(fluid::NBF, (p, T, q)::PTQ) # returns μ(p, T, q), ∂μ/∂p(p, T, q), ∂μ/∂T(p, T, q), ∂μ/∂q(p, T, q)
+        μ = NBF_chemical_potential_pθq(fluid, p, NBF_θ_pT(fluid, p, T), q)
+        ∂μ_∂p = - fluid.v0 * fluid.α_q
+        ∂μ_∂T = - NBF_∂s_mix_∂q(fluid, q)
+        ∂μ_∂q = - NBF_∂s_mix_∂qq(fluid, q) * T
+        return μ, ∂μ_∂p, ∂μ_∂T, ∂μ_∂q
+    end
+
     ## consvar = :entropy
     # PTQ
     conservative_variable(      fluid::NBFS, (p, T, q)::PTQ)    = NBF_s_θq(fluid, NBF_θ_pT(fluid, p, T), q)
@@ -150,7 +158,8 @@ const PVCons = NamedTuple{(:p, :v, :consvar)}
     modified_chemical_potential(fluid::NBFS, (p, s, q)::PConsQ) = NBF_chemical_potential_pθq(fluid, p, NBF_θ_sq(fluid, s, q), q)
     dcons_dq(                   fluid::NBFS, (p, s, q)::PConsQ) = NBF_∂s_mix_∂q(fluid, q) # with p, T const
     potential_temperature(      fluid::NBFS, (p, s, q)::PConsQ) = NBF_θ_sq(fluid, s, q)
-    
+    conjugate_variable(         fluid::NBFS, (p, s, q)::PConsQ) = NBF_T_pθ(fluid, p, NBF_θ_sq(fluid, s, q))
+
     function exner_functions(fluid::NBFS, (p, s, q)::PConsQ) # returns h, v, conjvar = T
         θ = NBF_θ_sq(fluid, s, q)
         h = NBF_h_pθq(fluid, p, θ, q)
@@ -178,13 +187,14 @@ const PVCons = NamedTuple{(:p, :v, :consvar)}
     modified_chemical_potential(fluid::NBFP, (p, T, q)::PTQ)    = NBF_modified_chemical_potential_pq(fluid, p, q)
 
     # PConsQ
-    temperature(        fluid::NBFP, (p, θ, q)::PConsQ)         = NBF_T_pθ(fluid, p, θ)
-    specific_enthalpy(  fluid::NBFP, (p, θ, q)::PConsQ)         = NBF_h_pθq(fluid, p, θ, q)
-    specific_volume(    fluid::NBFP, (p, θ, q)::PConsQ)         = NBF_v_pθq(fluid, p, θ, q)
-    heat_capacity(      fluid::NBFP, (p, θ, q)::PConsQ)         = fluid.Cp * one(θ)
-    modified_chemical_potential(fluid::NBFP, (p, θ, q)::PConsQ) = NBF_modified_chemical_potential_pq(fluid, p, q)
-    dcons_dq(               fluid::NBFP, (p, θ, q)::PConsQ)     = zero(θ) # with p, T const
-    potential_temperature(fluid::NBFP, (p, θ, q)::PConsQ)       = θ
+    temperature(            fluid::NBFP, (p, θ, q)::PConsQ)         = NBF_T_pθ(fluid, p, θ)
+    specific_enthalpy(      fluid::NBFP, (p, θ, q)::PConsQ)         = NBF_h_pθq(fluid, p, θ, q)
+    specific_volume(        fluid::NBFP, (p, θ, q)::PConsQ)         = NBF_v_pθq(fluid, p, θ, q)
+    heat_capacity(          fluid::NBFP, (p, θ, q)::PConsQ)         = fluid.Cp * one(θ)
+    modified_chemical_potential(fluid::NBFP, (p, θ, q)::PConsQ)     = NBF_modified_chemical_potential_pq(fluid, p, q)
+    dcons_dq(               fluid::NBFP, (p, θ, q)::PConsQ)         = zero(θ) # with p, T const
+    potential_temperature(  fluid::NBFP, (p, θ, q)::PConsQ)         = θ
+    conjugate_variable(     fluid::NBFP, (p, θ, q)::PConsQ)         = NBF_exner_pθ(fluid, p, θ)
 
     function exner_functions(fluid::NBFP, (p, θ, q)::PConsQ) # returns h, v, conjvar = Cp * T / θ
         h = NBF_h_pθq(fluid, p, θ, q)
@@ -192,12 +202,12 @@ const PVCons = NamedTuple{(:p, :v, :consvar)}
         conjvar = NBF_exner_pθ(fluid, p, θ)
         return h, v, conjvar
     end
-    function volume_functions(fluid::NBFP, (p, θ, q)::PConsQ) # returns v, ∂v/∂p, ∂v/∂θ
+    function volume_functions(fluid::NBFP, (p, θ, q)::PConsQ) # returns v(p, θ, q), ∂v/∂p, ∂v/∂θ, ∂v/∂q
         v = NBF_v_pθq(fluid, p, θ, q)
-        dv_dp = NBF_∂v_∂p(fluid, θ)
-        dv_dθ = NBF_∂v_∂θ(fluid, p, θ)
-        dv_dq = - fluid.v0 * fluid.α_q
-        return v, dv_dp, dv_dθ, dv_dq
+        ∂v_∂p = NBF_∂v_∂p(fluid, θ)
+        ∂v_∂θ = NBF_∂v_∂θ(fluid, p, θ)
+        ∂v_∂q = - fluid.v0 * fluid.α_q
+        return v, ∂v_∂p, ∂v_∂θ, ∂v_∂q
     end
 
     # VCons
@@ -229,67 +239,3 @@ const PVCons = NamedTuple{(:p, :v, :consvar)}
     composition(fluid::NBFS, (p, v, s)::PVCons) = NBF_composition_pvθ(fluid, p, v, NBF_θ_sq(fluid, s, q))
     composition(fluid::NBFP, (p, v, θ)::PVCons) = NBF_composition_pvθ(fluid, p, v, θ)
 end
-
-
-    # function solve_quad(a, b, c, prec)
-    #     # rudimentary function assumes a != 0, b >= 0 and discriminant >= 0
-    #     # selects root with smallest magnitude
-    #     δ = eps(prec)
-
-    #     Q = -0.5 * (b + sqrt(b^2 - 4a*c))
-        
-    #     # choose root closest to zero
-    #     r1 = Q / (a+δ)
-    #     r2 = c / Q
-    #     R1 = abs(r1)
-    #     R2 = abs(r2)
-    #     m = (sign(R1 - R2) + 1)/2
-    #     soln = r1 * (1 - m) + r2 * m
-
-    #     return soln
-    # end
-    # θ(p, T)
-    # function NBF_θ_pT(fluid::NonlinearBinaryFluid{CV, F}, p, T) where {CV, F}
-        # (; v0, Cp, α_T, γ, α_TT, p0, T0) = fluid
-        # a = -(v0/Cp) * (p - p0) * α_TT
-        # b = 1. + (v0/Cp) * ( α_T * (1 + 0.5 * γ * (p - p0)) + α_TT * T0 ) * (p - p0)
-        # c = (v0/Cp) * α_T * T0 * (1 + 0.5 * γ * (p - p0)) * (p - p0) - (T - T0)
-        # soln = solve_quad(a, b, c, F)
-        # return T0 + soln
-    # end
-    # θ(p, v, q)
-    # function NBF_θ_pvq(fluid::NonlinearBinaryFluid{CV, F}, p, v, q) where {CV, F}
-    #     (; T0, p0, q0, v0, α_T, α_TT, α_q, α_p, γ) = fluid
-    #     a = 0.5 * α_TT
-    #     b = α_T * (1 + γ * (p - p0))
-    #     c = - α_q * (q - q0) - α_p * (p - p0) - (v - v0)/v0
-    #     soln = solve_quad(a, b, c, F)
-    #     return T0 + soln
-    # end
-    # function NBF_θ_from_vTq(fluid, v, T, q)
-    #     (; v0, T0, q0, α_p, α_T, α_q, α_TT, γ, Cp) = fluid
-    #     # constructed polynomial in Δθ by eliminating Δp in v(p, θ, q) and T(p, θ)
-        
-    #     # helper parameters
-    #     A = (v - v0)/v0 + α_q * (q - q0)
-    #     b = 0.5 * α_TT
-    #     d = 0.5 * α_T * γ
-    #     ΔT = T - T0
-
-    #     # polynomial coefficients
-    #     c0 = -Cp * α_p^2 * ΔT + v0 * (d * A^2 * T0 - α_T * α_p * A * T0)
-    #     c1 = Cp * (α_p^2 + 4 * α_p * d * ΔT) + v0 * ( α_T^2 * α_p * T0 + d * A^2 - α_T * α_p * A - 2 * b * α_p * A * T0)
-    #     c2 = -Cp * (4 * α_p * d + 4 * d^2 * ΔT) + v0 * (α_T^2 * α_p + 3 * α_T * b * α_p * T0 + 3 * b * d * T0 * A - α_T^2 * d * T0 - 2 * b * α_p * A)
-    #     c3 = 4 * Cp * d^2 + v0 * (2 * b^2 * α_p * T0 + 2 * b * d * A - α_T^2 * d - 4 * α_T * b * d * T0 + 3 * α_T * b * α_p)
-    #     c4 = v0 * (2 * b^2 * α_p - 4 * α_T * b * d - 3 * b^2 * d * T0)
-    #     c5 = - 3 * b^2 * d * v0
-
-    #     # solve polynomial P(θ; v, T, q) = 0
-    #     rts = PolynomialRoots.roots([c0, c1, c2, c3, c4, c5])
-    #     rts_real = real.(rts[iszero.(imag.(rts))])
-
-    #     # discard complex roots and find solution closest to T0
-    #     _, idx = findmin(abs.(rts_real))
-
-    #     return T0 + rts_real[idx]
-    # end

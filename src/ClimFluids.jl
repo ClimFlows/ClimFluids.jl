@@ -144,8 +144,6 @@ include("julia/state_variables.jl")
 include("julia/perfectgas.jl")
 include("julia/ideal.jl")
 include("julia/lebonnois.jl")
-include("julia/linear_simple_fluid.jl")
-include("julia/linear_binary_fluid.jl")
 include("julia/nonlinear_binary_fluid.jl")
 include("julia/binarygas.jl")
 
