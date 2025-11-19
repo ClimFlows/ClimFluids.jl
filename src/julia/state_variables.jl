@@ -3,12 +3,18 @@ const PS = NamedTuple{(:p, :s)}
 const PT = NamedTuple{(:p, :T)}
 const PTh = NamedTuple{(:p, :theta)}
 const PCons = NamedTuple{(:p, :consvar)}
-const PTQ = NamedTuple{(:p, :T, :q)}
-const PVQ = NamedTuple{(:p, :v, :q)}
-const PConsQ = NamedTuple{(:p, :consvar, :q)}
 const VT = NamedTuple{(:v, :T)}
 const VS = NamedTuple{(:v, :s)}
 const VCons = NamedTuple{(:v, :consvar)}
+
+const PVQ = NamedTuple{(:p, :v, :q)}
+const PSQ = NamedTuple{(:p, :s, :q)}
+const PTQ = NamedTuple{(:p, :T, :q)}
+const PThQ = NamedTuple{(:p, :theta, :q)}
+const PConsQ = NamedTuple{(:p, :consvar, :q)}
+const VTQ = NamedTuple{(:v, :T, :q)}
+const VSQ = NamedTuple{(:v, :s, :q)}
+const VConsQ = NamedTuple{(:v, :consvar, :q)}
 
 @inlineall begin
 
@@ -17,6 +23,7 @@ const VCons = NamedTuple{(:v, :consvar)}
         (:p, :T, :q),
         (:p, :s, :q),
         (:p, :consvar, :q),
+        (:p, :theta, :q),
         (:v, :T, :q),
         (:v, :s, :q),
         (:v, :consvar, :q),
@@ -37,6 +44,7 @@ const VCons = NamedTuple{(:v, :consvar)}
         temperature,
         pressure,
         conservative_variable,
+        conjugate_variable,
         specific_volume,
         specific_entropy,
         specific_enthalpy,
@@ -47,7 +55,7 @@ const VCons = NamedTuple{(:v, :consvar)}
         exner_functions,
         volume_functions,
         sound_speed2,
-        sound_speed,
+        sound_speed
     )
 
     # one could imagine to specialize this function to restrict the list
@@ -67,6 +75,9 @@ const VCons = NamedTuple{(:v, :consvar)}
     temperature(::SimpleFluid, (v,T)::VT) = T
     pressure(::SimpleFluid, (p,T)::PT) = p
 
+    temperature(::BinaryFluid, (p,T,q)::PTQ) = T
+    temperature(::BinaryFluid, (v,T,q)::VTQ) = T
+    pressure(::BinaryFluid, (p,T,q)::PTQ) = p
 end
 
 # fallback, only sound_speed2 needs to be implemented
@@ -81,9 +92,9 @@ for fun in propertynames(all_state_functions())
 end
 
 # fallback implementations of potential temperature, volume, enthalpy
-@inline potential_volume(fluid::SimpleFluid, state::NamedTuple) = specific_volume(fluid, (; p=fluid.p0, s=specific_entropy(fluid, state)))
-@inline potential_temperature(fluid::SimpleFluid, state::NamedTuple) = temperature(fluid, (; p=fluid.p0, s=specific_entropy(fluid, state)))
-@inline potential_enthalpy(fluid::SimpleFluid, state::NamedTuple) = specific_enthalpy(fluid, (; p=fluid.p0, s=specific_entropy(fluid, state)))
+@inline potential_volume(fluid::SimpleFluid, state::NamedTuple)         = specific_volume(fluid, (; p=fluid.p0, s=specific_entropy(fluid, state)))
+@inline potential_temperature(fluid::SimpleFluid, state::NamedTuple)    = temperature(fluid, (; p=fluid.p0, s=specific_entropy(fluid, state)))
+@inline potential_enthalpy(fluid::SimpleFluid, state::NamedTuple)       = specific_enthalpy(fluid, (; p=fluid.p0, s=specific_entropy(fluid, state)))
 
 # helper types to implement the pattern
 #   fluid_pT = fluid(:p, :T)
@@ -109,8 +120,11 @@ end
 
 @inlineall begin
 
-    (fluid::AbstractFluid)(v1::Symbol, v2::Symbol) =
+    (fluid::SimpleFluid)(v1::Symbol, v2::Symbol) =
         FluidWithVars{(v1, v2),typeof(fluid)}(fluid)
+
+    (fluid::BinaryFluid)(v1::Symbol, v2::Symbol, v3::Symbol) =
+        FluidWithVars{(v1, v2, v3),typeof(fluid)}(fluid)
 
     Base.propertynames(fluid::FluidWithVars{vars}) where {vars} =
         propertynames(state_functions(fluid.fluid))
@@ -127,5 +141,10 @@ end
         state_fun = getfield(state_functions(fluid), fun)
         return state_fun(fluid, args)
     end
-
+    function (fluid_fun::StateFunction{vars,fun})(v1, v2, v3) where {vars,fun}
+        args = NamedTuple{vars}((v1, v2, v3))
+        fluid = fluid_fun.fluid
+        state_fun = getfield(state_functions(fluid), fun)
+        return state_fun(fluid, args)
+    end
 end

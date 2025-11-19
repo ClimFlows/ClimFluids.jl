@@ -1,11 +1,12 @@
 module ClimFluids
 using MuladdMacro
+using PolynomialRoots
 
-export AbstractFluid, IdealPerfectGas, CpVarPerfectGas
+export AbstractFluid, IdealPerfectGas, CpVarPerfectGas, NonlinearBinaryFluid
 export temperature,
     specific_entropy, specific_volume, specific_enthalpy, specific_internal_energy
 export potential_temperature, conservative_variable, exner_functions
-export sound_speed, components
+export sound_speed, sound_speed2, components
 
 # By default, dot expressions treat user-defined types as iterators, not scalars.
 # Derive your types from this abstract type if you want
@@ -31,6 +32,12 @@ Returns the conservative variable given a `fluid` and a `state` (named tuple of 
 Which conservative variable is chosen is a parameter given to the constructor of `fluid`.
 """
 function conservative_variable end
+
+"""
+    conjvar = conjugate_variable(fluid, state)
+Returns the variable conjugate to the conservative variable given a `fluid` and a `state` (named tuple of state variables).
+"""
+function conjugate_variable end
 
 """
     p = pressure(fluid, state)
@@ -137,6 +144,7 @@ include("julia/state_variables.jl")
 include("julia/perfectgas.jl")
 include("julia/ideal.jl")
 include("julia/lebonnois.jl")
+include("julia/nonlinear_binary_fluid.jl")
 include("julia/binarygas.jl")
 
 @inline pow_fast(x, y) = @fastmath exp(y * log(x))

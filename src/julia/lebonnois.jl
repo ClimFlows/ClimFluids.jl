@@ -69,6 +69,7 @@ VarCpPerfectGas(params) =  VarCpPerfectGas(
     end
 
     conservative_variable(gas::VCPG, (p,T)::PT) = specific_entropy(gas, (;p,T))
+    conjugate_variable(gas::VCPG, (p,T)::PT) = T
     function specific_entropy(gas::VCPG, (p,T)::PT)
         (; nu, T0, p0, Cp0, R)=gas
         T,p = T*inv(T0), p*inv(p0)

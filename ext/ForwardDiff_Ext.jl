@@ -19,7 +19,7 @@ import ClimFluids: fwdd_exner_functions, fwdd_volume_functions
 end
 
 @inline function fwdd_exner_functions(gas::BinaryFluid, (p_, consvar_, q_)::PConsQ)
-    p, consvar, q = duals(consvar_, q_)
+    p, consvar, q = duals(p_, consvar_, q_)
     T = temperature(gas, (; p, consvar, q))
     h = specific_enthalpy(gas, (; p, T, q))
     (hh, (v, Pi0, Pi1)) = h.value, h.partials
@@ -32,6 +32,14 @@ end
     v = specific_volume(gas, (; p, T))
     (v, (dv_dp, dv_dconsvar,)) = v.value, v.partials
     return v, dv_dp, dv_dconsvar
+end
+
+@inline function fwdd_volume_functions(gas::BinaryFluid, (p_, consvar_, q_)::PConsQ)
+    p, consvar, q = duals(p_, consvar_, q_)
+    T = temperature(gas, (; p, consvar, q))
+    v = specific_volume(gas, (; p, T, q))
+    (v, (dv_dp, dv_dconsvar, dv_dq)) = v.value, v.partials
+    return v, dv_dp, dv_dconsvar, dv_dq
 end
 
 end # module
