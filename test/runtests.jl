@@ -43,3 +43,17 @@ end
 
 test()
 
+# the state functions of a NonlinearBinaryFluid are in the float type of its parameters
+@testset "NonlinearBinaryFluid in $F" for F in (Float32, BigFloat), consvar in (:entropy, :potential_temperature)
+    params = (; Cp0 = 4000, p0 = 1.1e5, T0 = 300, q0 = 0.035, v0 = 1e-3, α_p = 1e-9, α_T = 2e-4, α_q = 0.8, α_TT = 1e-5, γ = 1e-8,
+              M_s = 3.14038218e-2, R = 8.31446261815324)
+    fluid = ClimFluids.NonlinearBinaryFluid(consvar, map(F, params))
+    p, T, q = F(1e5), F(295), F(0.034)
+    c = fluid(:p, :T, :q).conservative_variable(p, T, q)
+    @test c isa F
+    @test all(x -> x isa F, (fluid(:p, :consvar, :q).specific_enthalpy(p, c, q), fluid(:p, :consvar, :q).specific_volume(p, c, q),
+                             fluid(:p, :consvar, :q).temperature(p, c, q), fluid(:p, :consvar, :q).conjugate_variable(p, c, q),
+                             fluid(:p, :T, :q).sound_speed2(p, T, q), fluid(:v, :consvar, :q).pressure(F(1e-3), c, q)))
+    @test all(x -> x isa F, fluid(:p, :consvar, :q).volume_functions(p, c, q))
+end
+
