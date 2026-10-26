@@ -61,21 +61,21 @@ const PVCons = NamedTuple{(:p, :v, :consvar)}
         return p
     end
     # p(v, θ, q)
-    NBF_p_vθq((; p0, α_T, γ, T0, α_p, v0, α_q, q0, α_TT), v, θ, q) = p0 + inv( α_T * γ * (θ - T0) - α_p ) * ( (v - v0)/v0 + α_q * (q - q0) - α_T * (θ - T0) - 0.5 * α_TT * (θ - T0)^2 )
+    NBF_p_vθq((; p0, α_T, γ, T0, α_p, v0, α_q, q0, α_TT), v, θ, q) = p0 + inv( α_T * γ * (θ - T0) - α_p ) * ( (v - v0)/v0 + α_q * (q - q0) - α_T * (θ - T0) - α_TT / 2 * (θ - T0)^2 )
     # T(p, θ)
     NBF_T_pθ((; v0, Cp0, α_T, γ, α_TT, p0, T0), p, θ) = (θ / Cp0) * NBF_exner_pθ((; Cp0, v0, α_T, γ, p0, α_TT, T0), p, θ)
     # ∂T/∂θ(p, θ)
-    NBF_∂T_∂θ((; v0, Cp0, α_T, γ, α_TT, p0, T0), p, θ) = 1 + v0 * ( α_T * (1 + 0.5 * γ * (p - p0)) + α_TT * (2*θ - T0) ) * (p - p0) / Cp0
+    NBF_∂T_∂θ((; v0, Cp0, α_T, γ, α_TT, p0, T0), p, θ) = 1 + v0 * ( α_T * (1 + γ / 2 * (p - p0)) + α_TT * (2*θ - T0) ) * (p - p0) / Cp0
     # θ(p, T): T = θ (1 + a + b (θ - T0)) is quadratic in θ, b θ² + B θ - T = 0 with B = 1 + a - b T0,
     # whose root θ = 2T / (B + √(B² + 4bT)) reduces to θ = T / B as b → 0
     function NBF_θ_pT((; v0, Cp0, α_T, γ, α_TT, p0, T0), p, T)
-        a = v0 * α_T * (1 + 0.5 * γ * (p - p0)) * (p - p0) / Cp0
+        a = v0 * α_T * (1 + γ / 2 * (p - p0)) * (p - p0) / Cp0
         b = v0 * α_TT * (p - p0) / Cp0
         B = 1 + a - b * T0
         return 2T / (B + sqrt(B^2 + 4b * T))
     end
     # ∂θ/∂p(p, T) at fixed T, = -(∂T/∂p)_θ / (∂T/∂θ)_p
-    NBF_∂θ_∂p((; v0, Cp0, α_T, γ, α_TT, p0, T0), p, T, theta) = - ( (v0/Cp0) * ( α_T + α_T * γ * (p - p0) + α_TT * (theta - T0) ) * theta) / ( 1 + (v0 / Cp0) * ( α_T + 0.5 * α_T * γ * (p - p0) + α_TT * (2*theta - T0) ) * (p - p0) )
+    NBF_∂θ_∂p((; v0, Cp0, α_T, γ, α_TT, p0, T0), p, T, theta) = - ( (v0/Cp0) * ( α_T + α_T * γ * (p - p0) + α_TT * (theta - T0) ) * theta) / ( 1 + (v0 / Cp0) * ( α_T + α_T / 2 * γ * (p - p0) + α_TT * (2*theta - T0) ) * (p - p0) )
     # θ(p, v, q): with x = θ - T0, v(p, θ, q) = v gives ½ α_TT x² + A x - R = 0, A = α_T (1 + γ (p - p0)),
     # R = v/v0 - 1 + α_q (q - q0) + α_p (p - p0); root x = 2R / (A + √(A² + 2 α_TT R)) (warm side of any density maximum)
     function NBF_θ_pvq((; p0, T0, q0, v0, α_p, α_T, α_q, γ, α_TT), p, v, q)
@@ -101,15 +101,15 @@ const PVCons = NamedTuple{(:p, :v, :consvar)}
     # s_mix''(q)
     NBF_∂s_mix_∂qq((; R_s), q) = - R_s / q
     # v(p, θ, q) = ∂h/∂p(p, θ, q)
-    NBF_v_pθq((; p0, T0, q0, v0, α_p, α_T, α_q, γ, α_TT), p, θ, q) = v0 * ( 1 + α_T * (1 + γ * (p - p0)) * (θ - T0) - α_q * (q - q0) - α_p * (p - p0) + 0.5 * α_TT * (θ - T0)^2 )
+    NBF_v_pθq((; p0, T0, q0, v0, α_p, α_T, α_q, γ, α_TT), p, θ, q) = v0 * ( 1 + α_T * (1 + γ * (p - p0)) * (θ - T0) - α_q * (q - q0) - α_p * (p - p0) + α_TT / 2 * (θ - T0)^2 )
     # ∂v/∂p(p, θ, q)
     NBF_∂v_∂p((; v0, α_p, α_T, γ, T0), θ) = - v0 * α_p + v0 * α_T * γ * (θ - T0)
     # ∂v/∂θ(p, θ, q)
     NBF_∂v_∂θ((; v0, α_T, γ, α_TT, p0, T0), p, θ) = v0 * α_T * ( 1 + γ * (p - p0)) + v0 * α_TT * (θ - T0)
     # π = Cp0.T / θ = ∂h/∂θ(p, θ, q)
-    NBF_exner_pθ((; Cp0, v0, α_T, γ, p0, α_TT, T0), p, θ) = Cp0 + v0 * ( α_T * (1 + 0.5 * γ * (p - p0)) + α_TT * (θ - T0) ) * (p - p0)
+    NBF_exner_pθ((; Cp0, v0, α_T, γ, p0, α_TT, T0), p, θ) = Cp0 + v0 * ( α_T * (1 + γ / 2 * (p - p0)) + α_TT * (θ - T0) ) * (p - p0)
     # h(p, θ, q)
-    NBF_h_pθq((; p0, T0, q0, v0, α_p, α_T, α_q, γ, α_TT, Cp0), p, θ, q) = Cp0 * (θ - T0) + v0 * ( 1 + α_T * (1 + 0.5 * γ * (p - p0)) * (θ - T0) - α_q * (q - q0) - 0.5 * α_p * (p - p0) + 0.5 * α_TT * (θ - T0)^2 ) * (p - p0)
+    NBF_h_pθq((; p0, T0, q0, v0, α_p, α_T, α_q, γ, α_TT, Cp0), p, θ, q) = Cp0 * (θ - T0) + v0 * ( 1 + α_T * (1 + γ / 2 * (p - p0)) * (θ - T0) - α_q * (q - q0) - α_p / 2 * (p - p0) + α_TT / 2 * (θ - T0)^2 ) * (p - p0)
     # c2(p, θ, q)
     NBF_c2_pθq((; p0, T0, q0, v0, α_p, α_T, α_q, γ, α_TT), p, θ, q) = - NBF_v_pθq((; p0, T0, q0, v0, α_p, α_T, α_q, γ, α_TT), p, θ, q)^2 / NBF_∂v_∂p((; v0, α_p, α_T, γ, T0), θ)
     # μ(p, θ, q) = ∂h/∂q(p, s, q) = ∂h/∂q(p, θ, q) + ∂h/∂θ(p, θ, q) ∂θ/∂q(s, q)
@@ -121,7 +121,7 @@ const PVCons = NamedTuple{(:p, :v, :consvar)}
     # μθ(p, θ, q) = ∂h/∂q(p, θ, q)
     NBF_modified_chemical_potential_pq((; v0, α_q, p0), p, q) = - v0 * α_q * (p - p0) * one(q)
     # q(p, v, θ) 
-    NBF_composition_pvθ((; p0, T0, q0, v0, α_p, α_T, α_q, γ, α_TT), p, v, θ) = q0 + (-(v - v0)/v0 + α_T * (1 + γ * (p - p0)) * (θ - T0) - α_p * (p - p0) + 0.5 * α_TT * (θ - T0)^2 )/α_q
+    NBF_composition_pvθ((; p0, T0, q0, v0, α_p, α_T, α_q, γ, α_TT), p, v, θ) = q0 + (-(v - v0)/v0 + α_T * (1 + γ * (p - p0)) * (θ - T0) - α_p * (p - p0) + α_TT / 2 * (θ - T0)^2 )/α_q
     # q(p, v, s) from solving v(p, θ(s, q), q) - v = 0, since θ(s, q) depends on q through s_mix(q).
     # v - v(p, θ(s, q), q) is monotone in q, so the root is unique; steps are limited to q/2 to keep q > 0.
     function NBF_composition_pvs(fluid::NonlinearBinaryFluid{CV, F}, p, v, s) where {CV, F}
