@@ -55,5 +55,11 @@ test()
                              fluid(:p, :consvar, :q).temperature(p, c, q), fluid(:p, :consvar, :q).conjugate_variable(p, c, q),
                              fluid(:p, :T, :q).sound_speed2(p, T, q), fluid(:v, :consvar, :q).pressure(F(1e-3), c, q)))
     @test all(x -> x isa F, fluid(:p, :consvar, :q).volume_functions(p, c, q))
+    # the chemical potential, directly and as the first of its derivatives, from (p, T, q) and (p, consvar, q)
+    μ = fluid(:p, :T, :q).chemical_potential(p, T, q)
+    @test μ isa F
+    @test μ == fluid(:p, :T, :q).chemical_potential_derivatives(p, T, q)[1]
+    @test fluid(:p, :consvar, :q).chemical_potential(p, c, q) ≈ μ
 end
 
+include("teos10.jl")
