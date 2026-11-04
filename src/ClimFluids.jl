@@ -1,7 +1,7 @@
 module ClimFluids
 using MuladdMacro
 
-export AbstractFluid, IdealPerfectGas, CpVarPerfectGas, NonlinearBinaryFluid
+export AbstractFluid, IdealPerfectGas, CpVarPerfectGas, NonlinearBinaryFluid, TEOS10Seawater
 export temperature,
     specific_entropy, specific_volume, specific_enthalpy, specific_internal_energy
 export potential_temperature, conservative_variable, exner_functions
@@ -140,6 +140,14 @@ given a binary `fluid` and a `state` (named tuple of state variables).
 function dcons_dq end
 
 """
+    μ = chemical_potential(fluid, state)
+Returns the chemical potential of the solute relative to the solvent, `μ = (∂h/∂q)` at fixed pressure and entropy
+(equivalently `(∂g/∂q)` at fixed pressure and temperature, with `g` the specific Gibbs function), given a binary `fluid`
+and a `state` (named tuple of state variables). Default implementation returns `first(chemical_potential_derivatives(fluid, state))`.
+"""
+function chemical_potential end
+
+"""
     μ, ∂μ_∂p, ∂μ_∂T, ∂μ_∂q = chemical_potential_derivatives(fluid, state)
 Returns the chemical potential `μ(p, T, q)` and its partial derivatives, given a binary `fluid` and a `state` (named tuple of state variables).
 """
@@ -171,6 +179,11 @@ include("julia/ideal.jl")
 include("julia/lebonnois.jl")
 include("julia/nonlinear_binary_fluid.jl")
 include("julia/binarygas.jl")
+include("julia/teos10/coefficients.jl")
+include("julia/teos10/gibbs.jl")
+include("julia/teos10/conversions.jl")
+include("julia/teos10/polynomials.jl")
+include("julia/teos10/fluid.jl")
 
 @inline pow_fast(x, y) = @fastmath exp(y * log(x))
 

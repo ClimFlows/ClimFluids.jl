@@ -77,6 +77,7 @@ const VConsQ = NamedTuple{(:v, :consvar, :q)}
         heat_capacity,
         modified_chemical_potential,
         dcons_dq,
+        chemical_potential,
         chemical_potential_derivatives
     )
 
@@ -114,8 +115,11 @@ for fun in propertynames(all_state_functions())
     end
 end
 
+# fallback, only chemical_potential_derivatives needs to be implemented
+@inline chemical_potential(fluid::BinaryFluid, state::NamedTuple) = first(chemical_potential_derivatives(fluid, state))
+
 # fallbacks for the state functions specific to binary fluids
-for fun in setdiff(propertynames(binary_state_functions()), propertynames(all_state_functions()))
+for fun in setdiff(propertynames(binary_state_functions()), propertynames(all_state_functions()), (:chemical_potential,))
     @eval @inline function $fun(fluid::BinaryFluid, state::NamedTuple)
         return fallback($fun, fluid, state)
     end
