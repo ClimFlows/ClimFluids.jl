@@ -31,8 +31,12 @@
         # saline part: G = a ξ² ln ξ + Σᵢ cᵢ ξⁱ, written as ξ² (a ln ξ + P(ξ)), P = Σᵢ cᵢ ξⁱ⁻²,
         # and the sums Σᵢ i cᵢ ξⁱ⁻² (for ∂/∂q) and Σᵢ i (i - 2) cᵢ ξⁱ⁻² (for ∂²/∂q²)
         a, a_τ = F(TEOS_GS_LOG[1]) + F(TEOS_GS_LOG[2]) * τ, F(TEOS_GS_LOG[2])
-        (c2, c2_τ, c2_ττ), (c3, c3_τ, c3_ττ), (c4, c4_τ, c4_ττ), (c5, c5_τ, c5_ττ), (c6, c6_τ, c6_ττ), (c7, c7_τ, c7_ττ) =
-            map(c -> TEOS_poly_derivatives(F, τ, c), TEOS_GS_ALL)
+        c2, c2_τ, c2_ττ = TEOS_poly_derivatives(F, τ, TEOS_GS_ALL[1])
+        c3, c3_τ, c3_ττ = TEOS_poly_derivatives(F, τ, TEOS_GS_ALL[2])
+        c4, c4_τ, c4_ττ = TEOS_poly_derivatives(F, τ, TEOS_GS_ALL[3])
+        c5, c5_τ, c5_ττ = TEOS_poly_derivatives(F, τ, TEOS_GS_ALL[4])
+        c6, c6_τ, c6_ττ = TEOS_poly_derivatives(F, τ, TEOS_GS_ALL[5])
+        c7, c7_τ, c7_ττ = TEOS_poly_derivatives(F, τ, TEOS_GS_ALL[6])
         P    = evalpoly(ξ, (c2, c3, c4, c5, c6, c7))
         P_τ  = evalpoly(ξ, (c2_τ, c3_τ, c4_τ, c5_τ, c6_τ, c7_τ))
         P_ττ = evalpoly(ξ, (c2_ττ, c3_ττ, c4_ττ, c5_ττ, c6_ττ, c7_ττ))
