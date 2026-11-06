@@ -1,31 +1,33 @@
-# The dynamic enthalpy H(x, y, z) = ∫₀ᶻ v dz' = Σ Vᵢⱼₖ xⁱ yʲ zᵏ⁺¹ / (k + 1), so that the specific enthalpy is
-#   h(p, Θ, q) = Cp0 (Θ - T0) + 10⁸ Pa × H,   and v = ∂h/∂p = ∂H/∂z,
-# to the rounding of the coefficients: all derivatives come from the same coefficients Vᵢⱼₖ / (k + 1) of H.
-# `TEOS_dH(F, x, y, z, Val((a, b, c)))` evaluates ∂ᵃ⁺ᵇ⁺ᶜH/∂xᵃ∂yᵇ∂zᶜ by Horner's scheme (z outermost, y innermost), its
-# coefficients computed once, when the method is compiled, and converted to the float type F.
+# The dynamic enthalpy H(x, y, z) = ∫₀ᶻ v dz' = Σ Hᵢⱼₖ xⁱ yʲ zᵏ⁺¹, with Hᵢⱼₖ = Vᵢⱼₖ / (k + 1), gives
+#   h(p, Θ, q) = Cp0 (Θ - T0) + 10⁸ Pa × H   and   v = ∂h/∂p = ∂H/∂z.
+# `TEOS_dH(V, H, x, y, z, Val((a, b, d)))` evaluates ∂ᵃ⁺ᵇ⁺ᵈH/∂xᵃ∂yᵇ∂zᵈ by Horner's scheme (z outermost, y innermost),
+# from the coefficients Vᵢⱼₖ and Hᵢⱼₖ held by the fluid.
 
 # n (n - 1) ⋯ (n - m + 1)
 TEOS_falling(n, m) = prod(n-m+1:n; init = 1)
 
-# Horner expression of Σ cᵢⱼₖ xⁱ yʲ zᵏ, with the coefficients in a dictionary (i, j, k) => cᵢⱼₖ
-function TEOS_horner(F, coefs)
+# Horner expression of Σ cᵢⱼₖ xⁱ yʲ zᵏ, from a dictionary (i, j, k) => expression of cᵢⱼₖ
+function TEOS_horner(zero_coef, coefs)
     horner(var, terms) = foldr((t, acc) -> :(muladd($acc, $var, $t)), terms[1:end-1]; init = terms[end])
     degree(d) = maximum(key -> key[d], keys(coefs); init = 0)
-    poly_y(i, k) = horner(:y, [F(get(coefs, (i, j, k), 0.0)) for j in 0:degree(2)])
+    poly_y(i, k) = horner(:y, [get(coefs, (i, j, k), zero_coef) for j in 0:degree(2)])
     poly_x(k) = horner(:x, [poly_y(i, k) for i in 0:degree(1)])
     return horner(:z, [poly_x(k) for k in 0:degree(3)])
 end
 
-@generated function TEOS_dH(::Type{F}, x, y, z, ::Val{abc}) where {F, abc}
-    a, b, c = abc
-    coefs = Dict{NTuple{3, Int}, Float64}()
-    for (i, j, k, V) in TEOS_V
-        if i >= a && j >= b && k + 1 >= c
-            coefs[(i - a, j - b, k + 1 - c)] = V / (k + 1) * TEOS_falling(i, a) * TEOS_falling(j, b) * TEOS_falling(k + 1, c)
+@generated function TEOS_dH(V::NTuple{N, F}, H::NTuple{N, F}, x, y, z, ::Val{abc}) where {N, F, abc}
+    a, b, d = abc
+    coefs = Dict{NTuple{3, Int}, Any}()
+    for (n, (i, j, k, _)) in enumerate(TEOS_V)
+        if i >= a && j >= b && k + 1 >= d
+            # coefficient of xⁱ⁻ᵃ yʲ⁻ᵇ zᵏ⁺¹⁻ᵈ: Hᵢⱼₖ, or Vᵢⱼₖ = (k + 1) Hᵢⱼₖ if d ≥ 1, times integer factors
+            factor = TEOS_falling(i, a) * TEOS_falling(j, b) * (d == 0 ? 1 : TEOS_falling(k, d - 1))
+            coef = d == 0 ? :(H[$n]) : :(V[$n])
+            coefs[(i - a, j - b, k + 1 - d)] = factor == 1 ? coef : :($factor * $coef)
         end
     end
     isempty(coefs) && return :(zero(x * y * z))
-    return Expr(:block, Expr(:meta, :inline), TEOS_horner(F, coefs))
+    return Expr(:block, Expr(:meta, :inline), TEOS_horner(:(zero($F)), coefs))
 end
 
 @fastmath @muladd @inlineall begin
@@ -33,12 +35,12 @@ end
     # (x, y, z, ∂x/∂q) of the polynomial at (p, Θ, q); the methods below take this tuple, `xyz`
     function TEOS_xyz(fluid::AbstractFluid{F}, p, Θ, q) where {F}
         (; p0, T0, q_star) = fluid
-        x = sqrt((q + F(0.024)) / q_star)
+        x = sqrt((q + F(3) / 125) / q_star)               # x = √((q + 0.024) / q*)
         return x, (Θ - T0) / 40, (p - p0) / 100_000_000, 1 / (2q_star * x)
     end
 
     # derivatives of h(p, Θ, q), from those of H
-    TEOS_H(fluid::AbstractFluid{F}, (x, y, z, _), a, b, c) where {F} = TEOS_dH(F, x, y, z, Val((a, b, c)))
+    TEOS_H(fluid, (x, y, z, _), a, b, c) = TEOS_dH(fluid.V, fluid.H, x, y, z, Val((a, b, c)))
 
     # h, v
     TEOS_h(fluid, xyz, Θ)   = fluid.Cp0 * (Θ - fluid.T0) + 100_000_000 * TEOS_H(fluid, xyz, 0, 0, 0)

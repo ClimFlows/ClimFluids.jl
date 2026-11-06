@@ -10,6 +10,9 @@ allocated(fun, fluid, state) = (fun(fluid, state); @allocated fun(fluid, state))
 
 # a grid over the range of validity of the 75-term polynomial: S_A [g/kg], Θ [°C], p - p0 [dbar]
 const GRID = Iterators.product(range(0.5, 42, 7), range(-2, 40, 7), range(0, 6000, 5))
+# the whole grid in Float64, its corners and centre in other float types, whose arithmetic is slower
+grid(::Type{Float64}) = GRID
+grid(::Type) = Iterators.product((0.5, 21.0, 42.0), (-2.0, 19.0, 40.0), (0.0, 3000.0, 6000.0))
 
 const CONSVARS = (:conservative_temperature, :potential_temperature, :entropy)
 
@@ -72,38 +75,40 @@ const CONSVARS = (:conservative_temperature, :potential_temperature, :entropy)
         end
     end
 
-    # all state functions derive from h(p, η, q), so the identities of thermodynamics hold to round-off
-    @testset "identities: $consvar" for consvar in CONSVARS
-        fluid = TEOS10Seawater(consvar)
+    # all state functions derive from h(p, η, q), so the identities of thermodynamics hold to round-off, in any float
+    # type: the tolerances are those of Float64 scaled by eps(F) / eps(Float64), on part of the grid for BigFloat
+    @testset "identities in $F: $consvar" for F in (Float64, BigFloat), consvar in CONSVARS
+        fluid = TEOS10Seawater(consvar; F)
         fluid_pTq, fluid_pφq, fluid_pηq = fluid(:p, :T, :q), fluid(:p, :consvar, :q), fluid(:p, :s, :q)
-        for (S, Θ, p_dbar) in GRID
-            p, q = pressure_Pa(p_dbar), S / 1000
-            φ = fluid(:p, :theta, :q).conservative_variable(p, T0 + gsw_pt_from_ct(S, Θ), q)
+        scale = eps(F) / eps(Float64)
+        for (S, Θ, p_dbar) in grid(F)
+            p, q = F(pressure_Pa(p_dbar)), F(S) / 1000
+            φ = fluid(:p, :theta, :q).conservative_variable(p, fluid.T0 + F(gsw_pt_from_ct(S, Θ)), q)
             T = fluid_pφq.temperature(p, φ, q)
             η = fluid_pφq.specific_entropy(p, φ, q)
             h, v, conjvar = fluid_pφq.exner_functions(p, φ, q)
-            @test v ≈ derivative(p -> fluid_pφq.specific_enthalpy(p, φ, q), p) rtol = 1e-10
-            @test conjvar ≈ derivative(φ -> fluid_pφq.specific_enthalpy(p, φ, q), φ) rtol = 1e-10
-            @test fluid_pφq.modified_chemical_potential(p, φ, q) ≈ derivative(q -> fluid_pφq.specific_enthalpy(p, φ, q), q) rtol = 1e-9
-            @test T ≈ derivative(η -> fluid_pηq.specific_enthalpy(p, η, q), η) rtol = 1e-12
-            @test fluid_pφq.potential_enthalpy(p, φ, q) ≈ fluid_pφq.specific_enthalpy(fluid.p0, φ, q) rtol = 1e-12 atol = 1e-6
-            @test fluid_pφq.specific_internal_energy(p, φ, q) ≈ h - p * v rtol = 1e-12
-            @test fluid_pφq.sound_speed2(p, φ, q) ≈ -v^2 / derivative(p -> fluid_pηq.specific_volume(p, η, q), p) rtol = 1e-10
-            @test fluid_pφq.heat_capacity(p, φ, q) ≈ T * derivative(T -> fluid_pTq.specific_entropy(p, T, q), T) rtol = 1e-9
-            @test fluid_pφq.dcons_dq(p, φ, q) ≈ derivative(q -> fluid_pTq.conservative_variable(p, T, q), q) rtol = 1e-8 atol = 1e-12
+            @test v ≈ derivative(p -> fluid_pφq.specific_enthalpy(p, φ, q), p) rtol = 1e-10scale
+            @test conjvar ≈ derivative(φ -> fluid_pφq.specific_enthalpy(p, φ, q), φ) rtol = 1e-10scale
+            @test fluid_pφq.modified_chemical_potential(p, φ, q) ≈ derivative(q -> fluid_pφq.specific_enthalpy(p, φ, q), q) rtol = 1e-9scale
+            @test T ≈ derivative(η -> fluid_pηq.specific_enthalpy(p, η, q), η) rtol = 1e-12scale
+            @test fluid_pφq.potential_enthalpy(p, φ, q) ≈ fluid_pφq.specific_enthalpy(fluid.p0, φ, q) rtol = 1e-12scale atol = 1e-6scale
+            @test fluid_pφq.specific_internal_energy(p, φ, q) ≈ h - p * v rtol = 1e-12scale
+            @test fluid_pφq.sound_speed2(p, φ, q) ≈ -v^2 / derivative(p -> fluid_pηq.specific_volume(p, η, q), p) rtol = 1e-10scale
+            @test fluid_pφq.heat_capacity(p, φ, q) ≈ T * derivative(T -> fluid_pTq.specific_entropy(p, T, q), T) rtol = 1e-9scale
+            @test fluid_pφq.dcons_dq(p, φ, q) ≈ derivative(q -> fluid_pTq.conservative_variable(p, T, q), q) rtol = 1e-8scale atol = 1e-12scale
             # μ = ∂g/∂q at fixed (p, T), g = h - T η, and its derivatives
             μ, μ_p, μ_T, μ_q = fluid_pTq.chemical_potential_derivatives(p, T, q)
             gibbs(p, T, q) = fluid_pTq.specific_enthalpy(p, T, q) - T * fluid_pTq.specific_entropy(p, T, q)
-            @test μ ≈ derivative(q -> gibbs(p, T, q), q) rtol = 1e-8
-            @test μ_p ≈ derivative(q -> fluid_pTq.specific_volume(p, T, q), q) rtol = 1e-8
-            @test μ_T ≈ -derivative(q -> fluid_pTq.specific_entropy(p, T, q), q) rtol = 1e-8
-            @test μ_q ≈ derivative(q -> fluid_pTq.chemical_potential_derivatives(p, T, q)[1], q) rtol = 1e-8
+            @test μ ≈ derivative(q -> gibbs(p, T, q), q) rtol = 1e-8scale
+            @test μ_p ≈ derivative(q -> fluid_pTq.specific_volume(p, T, q), q) rtol = 1e-8scale
+            @test μ_T ≈ -derivative(q -> fluid_pTq.specific_entropy(p, T, q), q) rtol = 1e-8scale
+            @test μ_q ≈ derivative(q -> fluid_pTq.chemical_potential_derivatives(p, T, q)[1], q) rtol = 1e-8scale
             @test all(fluid_pφq.chemical_potential_derivatives(p, φ, q) .≈ (μ, μ_p, μ_T, μ_q))
             # the chemical potential alone, from (p, T, q) and (p, φ, q), as the first of its derivatives: μ is a sum of
             # Gibbs terms of order Cp0 T0, which may nearly cancel, and the compiler may round it differently in the two
             # functions
-            @test fluid_pTq.chemical_potential(p, T, q) ≈ μ atol = 8eps() * fluid.Cp0 * T0
-            @test fluid_pφq.chemical_potential(p, φ, q) ≈ fluid_pφq.chemical_potential_derivatives(p, φ, q)[1] atol = 8eps() * fluid.Cp0 * T0
+            @test fluid_pTq.chemical_potential(p, T, q) ≈ μ atol = 8eps(F) * fluid.Cp0 * fluid.T0
+            @test fluid_pφq.chemical_potential(p, φ, q) ≈ fluid_pφq.chemical_potential_derivatives(p, φ, q)[1] atol = 8eps(F) * fluid.Cp0 * fluid.T0
         end
     end
 
@@ -113,29 +118,34 @@ const CONSVARS = (:conservative_temperature, :potential_temperature, :entropy)
         ClimFluids.test_fluid(TEOS10Seawater(consvar), pressure_Pa(5000), 275.0, 0.034)
     end
 
-    @testset "conversions between conservative variables" begin
-        fluid = TEOS10Seawater(:conservative_temperature)
-        for (S, Θ, _) in GRID, q in (S / 1000, 0.0)
-            θ = ClimFluids.TEOS_θ_Θq(fluid, T0 + Θ, q)
-            @test ClimFluids.TEOS_Θ_θq(fluid, θ, q) ≈ T0 + Θ rtol = 2eps()
-            @test ClimFluids.TEOS_θ_ηq(fluid, ClimFluids.TEOS_η_θq(fluid, θ, q), q) ≈ θ rtol = 2eps()
+    # the Newton iterations converge to the round-off of the float type
+    @testset "conversions between conservative variables in $F" for F in (Float64, BigFloat)
+        fluid = TEOS10Seawater(:conservative_temperature; F)
+        for (S, Θ, _) in grid(F), q in (F(S) / 1000, zero(F))
+            θ = ClimFluids.TEOS_θ_Θq(fluid, fluid.T0 + F(Θ), q)
+            @test ClimFluids.TEOS_Θ_θq(fluid, θ, q) ≈ fluid.T0 + F(Θ) rtol = 2eps(F)
+            @test ClimFluids.TEOS_θ_ηq(fluid, ClimFluids.TEOS_η_θq(fluid, θ, q), q) ≈ θ rtol = 2eps(F)
         end
     end
 
-    @testset "inversions" begin
-        fluid = TEOS10Seawater(:conservative_temperature)
-        for (S, Θ, p_dbar) in GRID
-            p, q, φ = pressure_Pa(p_dbar), S / 1000, T0 + Θ
+    @testset "inversions in $F" for F in (Float64, BigFloat)
+        fluid = TEOS10Seawater(:conservative_temperature; F)
+        for (S, Θ, p_dbar) in grid(F)
+            p, q, φ = F(pressure_Pa(p_dbar)), F(S) / 1000, fluid.T0 + F(Θ)
             v = fluid(:p, :consvar, :q).specific_volume(p, φ, q)
             # the error of p is the round-off of v amplified by 1 / |∂v/∂p| ≈ 2 × 10¹² Pa kg/m³
             @test fluid(:v, :consvar, :q).pressure(v, φ, q) ≈ p atol = 1e4 * eps(v) / 4e-13
             T = fluid(:p, :consvar, :q).temperature(p, φ, q)
-            @test fluid(:p, :T, :q).conservative_variable(p, T, q) ≈ φ rtol = 4eps()
+            @test fluid(:p, :T, :q).conservative_variable(p, T, q) ≈ φ rtol = 4eps(F)
             state = ClimFluids.canonical_state(fluid, (; v, T, q))
             @test state.p ≈ p atol = 1e4 * eps(v) / 4e-13
-            @test state.consvar ≈ φ rtol = 4eps()
+            @test state.consvar ≈ φ rtol = 4eps(F)
         end
-        # (p, v, q) has two roots on either side of the density maximum: the warm one is returned
+    end
+
+    # (p, v, q) has two roots on either side of the density maximum: the warm one is returned
+    @testset "inversion of v: the warm root" begin
+        fluid = TEOS10Seawater(:conservative_temperature)
         p, q = pressure_Pa(0), 0.0
         v_cold = fluid(:p, :consvar, :q).specific_volume(p, T0 + 1, q)
         Θ = fluid(:p, :v, :q).conservative_variable(p, v_cold, q)
@@ -181,7 +191,7 @@ const CONSVARS = (:conservative_temperature, :potential_temperature, :entropy)
                     fluid64(:p, :consvar, :q).temperature(p64, φ64, q64), fluid64(:v, :consvar, :q).pressure(9.7e-4, φ64, q64),
                     fluid64(:p, :T, :q).chemical_potential_derivatives(p64, T64, q64)...)
         @test all(x -> x isa F, (φ, values...))
-        # Float32 to its precision; BigFloat to that of Float64, its coefficients being those of Float64
+        # Float32 to its precision, BigFloat to that of Float64: the same decimal coefficients, rounded to each type
         @test all(isapprox.(values, values64; rtol = F == Float32 ? 1e-4 : 1e-12))
     end
 
