@@ -6,11 +6,8 @@
 
 @fastmath @muladd @inlineall begin
 
-    # evalpoly with the coefficients converted to the float type F of the fluid
-    TEOS_poly(::Type{F}, x, c) where {F} = evalpoly(x, map(F, c))
-
     # p(τ), p'(τ), p''(τ) from the coefficients of p, p', p''
-    TEOS_poly_derivatives(::Type{F}, τ, (c, c_τ, c_ττ)) where {F} = (TEOS_poly(F, τ, c), TEOS_poly(F, τ, c_τ), TEOS_poly(F, τ, c_ττ))
+    TEOS_poly_derivatives(τ, (c, c_τ, c_ττ)) = (evalpoly(τ, c), evalpoly(τ, c_τ), evalpoly(τ, c_ττ))
 
     # (ξ², ξ, ln ξ), which depend on q only: computed once in iterations over T
     function TEOS_salinity(fluid::AbstractFluid{F}, q) where {F}
@@ -21,22 +18,22 @@
     # g, ∂g/∂T, ∂g/∂q, ∂²g/∂T², ∂²g/∂T∂q, ∂²g/∂q² at (q, T, p0)
     TEOS_gibbs0(fluid, T, q) = TEOS_gibbs0(fluid, T, TEOS_salinity(fluid, q))
     function TEOS_gibbs0(fluid::AbstractFluid{F}, T, (ξ2, ξ, L)::Tuple) where {F}
-        (; T0, q_star) = fluid
+        (; T0, q_star, gibbs) = fluid
         T_star = F(40)
         τ = (T - T0) / T_star
 
         # pure water
-        gW, gW_τ, gW_ττ = TEOS_poly_derivatives(F, τ, TEOS_GW_ALL)
+        gW, gW_τ, gW_ττ = TEOS_poly_derivatives(τ, gibbs.W)
 
         # saline part: G = a ξ² ln ξ + Σᵢ cᵢ ξⁱ, written as ξ² (a ln ξ + P(ξ)), P = Σᵢ cᵢ ξⁱ⁻²,
         # and the sums Σᵢ i cᵢ ξⁱ⁻² (for ∂/∂q) and Σᵢ i (i - 2) cᵢ ξⁱ⁻² (for ∂²/∂q²)
-        a, a_τ = F(TEOS_GS_LOG[1]) + F(TEOS_GS_LOG[2]) * τ, F(TEOS_GS_LOG[2])
-        c2, c2_τ, c2_ττ = TEOS_poly_derivatives(F, τ, TEOS_GS_ALL[1])
-        c3, c3_τ, c3_ττ = TEOS_poly_derivatives(F, τ, TEOS_GS_ALL[2])
-        c4, c4_τ, c4_ττ = TEOS_poly_derivatives(F, τ, TEOS_GS_ALL[3])
-        c5, c5_τ, c5_ττ = TEOS_poly_derivatives(F, τ, TEOS_GS_ALL[4])
-        c6, c6_τ, c6_ττ = TEOS_poly_derivatives(F, τ, TEOS_GS_ALL[5])
-        c7, c7_τ, c7_ττ = TEOS_poly_derivatives(F, τ, TEOS_GS_ALL[6])
+        a, a_τ, _ = TEOS_poly_derivatives(τ, gibbs.log)
+        c2, c2_τ, c2_ττ = TEOS_poly_derivatives(τ, gibbs.S2)
+        c3, c3_τ, c3_ττ = TEOS_poly_derivatives(τ, gibbs.S3)
+        c4, c4_τ, c4_ττ = TEOS_poly_derivatives(τ, gibbs.S4)
+        c5, c5_τ, c5_ττ = TEOS_poly_derivatives(τ, gibbs.S5)
+        c6, c6_τ, c6_ττ = TEOS_poly_derivatives(τ, gibbs.S6)
+        c7, c7_τ, c7_ττ = TEOS_poly_derivatives(τ, gibbs.S7)
         P    = evalpoly(ξ, (c2, c3, c4, c5, c6, c7))
         P_τ  = evalpoly(ξ, (c2_τ, c3_τ, c4_τ, c5_τ, c6_τ, c7_τ))
         P_ττ = evalpoly(ξ, (c2_ττ, c3_ττ, c4_ττ, c5_ττ, c6_ττ, c7_ττ))

@@ -6,28 +6,48 @@ Return an object `fluid` describing seawater with the TEOS-10 thermodynamics, in
 Argument `consvar` defines the conservative variable chosen. Valid values are `:conservative_temperature`,
 `:potential_temperature` and `:entropy`.
 
-The thermodynamic potential is the specific enthalpy
+The thermodynamic potential is the specific enthalpy h(p, η, q) = h(p, Θ(η, q), q), with
 
     h(p, Θ, q) = Cp0 (Θ - T0) + ∫ v(p', Θ, q) dp'   (from p0 to p)
 
-with v the 75-term polynomial of Roquet et al. (2015), together with the entropy η(Θ, q) and the potential temperature
-θ(Θ, q) of the TEOS-10 Gibbs function at the pressure p0 (IAPWS-08, IAPWS-09). All state functions derive from this
+v the 75-term polynomial of Roquet et al. (2015), and Θ(η, q), η(Θ, q) and the potential temperature θ(Θ, q)
+given by the TEOS-10 Gibbs function g at the pressure p0 (IAPWS-08, IAPWS-09):
+Cp0 (Θ - T0) = g - θ ∂g/∂T and η = -∂g/∂T at T = θ. All state functions derive from this
 potential, so they are thermodynamically consistent; the fluid departs from the full TEOS-10 Gibbs function by the
 error of the 75-term fit, valid for 0 ≤ q ≤ 0.042, -2 °C ≤ Θ ≤ 40 °C and p - p0 ≤ 10⁸ Pa.
 
-Units are SI: absolute pressure `p` [Pa], absolute salinity `q` [kg/kg], temperatures `T`, `θ`, `Θ` [K] (Θ in K is the
-conservative temperature in °C plus T0 = 273.15 K), entropy [J/kg/K]. The normal pressure is `fluid.p0` = 101325 Pa.
+Units are SI: absolute pressure `p` [Pa], absolute salinity `q` [kg/kg], temperatures `T`, `θ`, `Θ` [K], entropy
+[J/kg/K]. Θ in K is the conservative temperature in °C plus T0 = 273.15 K.
+The normal pressure is `fluid.p0` = 101325 Pa.
+
+All computations are in the float type `F`: the published constants and coefficients of TEOS-10 are converted to `F`
+when the fluid is constructed, so that h, v and their derivatives are consistent to `eps(F)`.
 """
-struct TEOS10Seawater{CV, F} <: BinaryFluid{F}
-    p0::F       # normal pressure [Pa]
-    T0::F       # Celsius zero point [K]
-    Cp0::F      # potential enthalpy per unit conservative temperature [J/kg/K]
-    q_star::F   # reducing salinity of the Gibbs function [kg/kg]
+struct TEOS10Seawater{CV, F, G} <: BinaryFluid{F}
+    p0::F               # normal pressure [Pa]
+    T0::F               # Celsius zero point [K]
+    Cp0::F              # potential enthalpy per unit conservative temperature [J/kg/K]
+    q_star::F           # reducing salinity of the Gibbs function [kg/kg]
+    V::NTuple{75, F}    # coefficients Vᵢⱼₖ of the specific volume, in the order of `TEOS_V` [m³/kg]
+    H::NTuple{75, F}    # coefficients Vᵢⱼₖ / (k + 1) of the dynamic enthalpy, in the same order [m³/kg]
+    gibbs::G            # polynomials in τ of the Gibbs function at p0, with their derivatives [J/kg]
     function TEOS10Seawater(consvar::Symbol; F = Float64)
         @assert consvar in (:conservative_temperature, :potential_temperature, :entropy)
-        return new{consvar, F}(F(101325), F(273.15), F(3991.86795711963), F(35.16504) / 875)
+        T0, Cp0 = parse(F, "273.15"), parse(F, "3991.86795711963")
+        # q* = S_u / 1000 = 35.16504/875 kg/kg, with S_u = 40 × 35.16504/35 g/kg the reducing salinity of TEOS-10
+        q_star = parse(F, "35.16504") / 875
+        # coefficients of v and of the dynamic enthalpy H = ∫ v dz
+        V = map(((_, _, _, s),) -> parse(F, s), TEOS_V)
+        H = map(((_, _, k, _), Vijk) -> Vijk / (k + 1), TEOS_V, V)
+        # pure water gW(τ), the factor a(τ) of ξ² ln ξ and the polynomials cᵢ(τ) of ξⁱ, i = 2…7
+        gibbs = map(table -> TEOS_with_derivatives(F, table),
+                    (W = TEOS_GW, log = TEOS_GS_LOG, S2 = TEOS_GS2, S3 = TEOS_GS3, S4 = TEOS_GS4, S5 = TEOS_GS5,
+                     S6 = TEOS_GS6, S7 = TEOS_GS7))
+        return new{consvar, F, typeof(gibbs)}(F(101325), T0, Cp0, q_star, V, H, gibbs)
     end
 end
+
+Base.show(io::IO, ::TEOS10Seawater{CV, F}) where {CV, F} = print(io, "TEOS10Seawater(:", CV, "; F = ", F, ")")
 
 const TEOS  = TEOS10Seawater
 const TEOSC = TEOS10Seawater{:conservative_temperature}
